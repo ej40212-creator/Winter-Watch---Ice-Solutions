@@ -30,7 +30,8 @@ export default defineConfig(async ({ command }) => {
   const vars = Object.fromEntries(names.flatMap((name) => process.env[name] ? [[name, process.env[name]]] : []));
   const localBindingConfig = {
     main: "./build/sites-worker.ts",
-    compatibility_flags: ["nodejs_compat"],
+    // nodejs_compat and workers_dev live only in wrangler.jsonc. Repeating the
+    // flag here makes Miniflare refuse to start.
     workers_dev: false,
     vars,
   };

@@ -41,16 +41,24 @@ const ENV_KEYS = [
   "PILOT_PUBLIC_ORIGIN",
 ] as const;
 
+function copyEnv(bag: EnvBag, key: string, workerEnv?: object): void {
+  let value = "";
+  if (workerEnv && key in workerEnv) {
+    const fromWorker = (workerEnv as Record<string, unknown>)[key];
+    if (typeof fromWorker === "string") value = fromWorker;
+  }
+  if (!value && typeof process !== "undefined" && typeof process.env[key] === "string") value = process.env[key] ?? "";
+  if (value) bag[key] = value;
+}
+
 export function readRuntimeEnv(workerEnv?: object): EnvBag {
   const bag: EnvBag = {};
-  for (const key of ENV_KEYS) {
-    let value = "";
-    if (workerEnv && key in workerEnv) {
-      const fromWorker = (workerEnv as Record<string, unknown>)[key];
-      if (typeof fromWorker === "string") value = fromWorker;
+  for (const key of ENV_KEYS) copyEnv(bag, key, workerEnv);
+  // These names exist only in a dev build. A production bundle drops the branch, so the strings are not shipped.
+  if (import.meta.env?.DEV === true) {
+    for (const key of ["ACCESS_JWKS_JSON", "PILOT_SYNTHETIC_AUTH", "PILOT_SYNTHETIC_DATA", "PILOT_SYNTHETIC_PRIVATE_JWK"]) {
+      copyEnv(bag, key, workerEnv);
     }
-    if (!value && typeof process !== "undefined" && typeof process.env[key] === "string") value = process.env[key] ?? "";
-    if (value) bag[key] = value;
   }
   return bag;
 }
