@@ -1,5 +1,4 @@
 import { env } from "cloudflare:workers";
-import { readRuntimeEnv } from "../../../lib/access-auth";
 import { prepareRead } from "../../../lib/api-access";
 import { PRIVATE_NO_STORE } from "../../../lib/http";
 import { loadActivatedSites } from "../../../lib/site-directory";
@@ -18,8 +17,8 @@ export async function GET(request: Request) {
   }
   try {
     const sites = await loadActivatedSites(wrapD1(database));
-    return Response.json({ mode: sites.length ? "activated" : "empty", execution: "database", sites, envReady: Boolean(readRuntimeEnv().ACCESS_AUD) }, { headers: PRIVATE_NO_STORE });
+    return Response.json({ mode: sites.length ? "activated" : "empty", execution: "database", sites }, { headers: PRIVATE_NO_STORE });
   } catch {
-    return Response.json({ mode: "empty", execution: "not_run", sites: [], message: "Activated-site query failed. Nothing was invented." }, { status: 503, headers: PRIVATE_NO_STORE });
+    return Response.json({ mode: "empty", execution: "not_run", sites: [], message: "D1 is not ready. No activated sites are shown." }, { headers: PRIVATE_NO_STORE });
   }
 }

@@ -20,7 +20,8 @@ export async function GET(request: Request) {
     if (url.searchParams.has("key")) {
       const key = url.searchParams.get("key")!;
       if (!gate.allowLive) {
-        const cached = await readOutlook(key);
+        let cached = null;
+        try { cached = await readOutlook(key); } catch { cached = null; }
         return Response.json(cached ? { ...cached, execution: "cache" } : { key, status: "unavailable", ...NOT_RUN, minTemp: null, alerts: [], hours: [] }, { headers: PRIVATE_NO_STORE });
       }
       return Response.json(await forecast(key, { allowLive: true }), { headers: PRIVATE_NO_STORE });
