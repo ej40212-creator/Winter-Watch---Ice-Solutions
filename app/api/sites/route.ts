@@ -19,6 +19,6 @@ export async function GET(request: Request) {
     const sites = await loadActivatedSites(wrapD1(database));
     return Response.json({ mode: sites.length ? "activated" : "empty", execution: "database", sites }, { headers: PRIVATE_NO_STORE });
   } catch {
-    return Response.json({ mode: "empty", execution: "not_run", sites: [], message: "D1 is not ready. No activated sites are shown." }, { headers: PRIVATE_NO_STORE });
+    return Response.json({ mode: "empty", execution: "not_run", error: "configuration_required", message: "D1 is bound but the pilot schema is not applied, or the sites query failed. No site rows were returned." }, { status: 503, headers: PRIVATE_NO_STORE });
   }
 }

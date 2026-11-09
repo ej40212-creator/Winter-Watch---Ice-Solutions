@@ -110,7 +110,10 @@ export async function importSiteBatch(
   let sitesReused = 0;
   let reviewInserted = 0;
 
-  const transactional = input.dialect !== "d1";
+  if (input.dialect === "d1") {
+    throw new Error("The procedural importer is not a D1 transaction. Load a reviewed 1-40 site slice with applySeedBatch, which commits as one batch.");
+  }
+  const transactional = true;
   if (transactional) await db.exec("BEGIN");
   try {
     for (const row of prepared) {

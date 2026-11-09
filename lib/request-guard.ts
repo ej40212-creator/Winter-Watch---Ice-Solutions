@@ -59,13 +59,13 @@ export function authResponse(request: Request, status: number, error: string, me
   return Response.json({ error, message }, { status, headers: { "cache-control": "private, no-store" } });
 }
 
-export async function guardRequest(request: Request, env: EnvBag, now = Date.now(), options?: { devBuild?: boolean }): Promise<Response | null> {
+export async function guardRequest(request: Request, env: EnvBag, now = Date.now(), options?: { devBuild?: boolean; forceSynthetic?: boolean; staticJwks?: { keys: JsonWebKey[] } }): Promise<Response | null> {
   const url = new URL(request.url);
   if (isPublicAsset(url.pathname)) return null;
   const devBuild = options?.devBuild === true;
-  const loaded = loadAccessConfig(env, { devBuild });
+  const loaded = loadAccessConfig(env, options);
   if (url.pathname === "/api/pilot-session") {
-    if (!syntheticSessionsAllowed({ devBuild, host: url.hostname, authFlag: env.PILOT_SYNTHETIC_AUTH })) {
+    if (!syntheticSessionsAllowed({ devBuild, host: url.hostname, authFlag: devBuild ? "1" : undefined })) {
       return authResponse(request, 404, "not_found", "Synthetic sign-in is not available on this build or host.");
     }
     if (!isLoopbackHost(url.hostname)) return authResponse(request, 404, "not_found", "Synthetic sign-in is loopback-only.");

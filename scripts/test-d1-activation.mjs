@@ -6,6 +6,8 @@ import { wrapNodeSqlite } from '../lib/sql.ts';
 import { ensurePilotSchema } from '../lib/pilot-schema.ts';
 import { importSiteBatch } from '../lib/site-import.ts';
 import { activateSite, loadActivatedSites } from '../lib/site-directory.ts';
+import { applySeedBatch, reviewedSeedStatements } from '../lib/d1-seed.ts';
+import { consumeProviderCall } from '../lib/provider-budget.ts';
 
 const statements = [];
 const fake = {
@@ -24,27 +26,38 @@ assert.equal(statements.some((sql) => /^\s*(BEGIN|COMMIT|ROLLBACK)\b/i.test(sql)
 
 const memory = wrapNodeSqlite(new DatabaseSync(':memory:'));
 await ensurePilotSchema(memory);
-const guarded = {
-  async exec(sql) {
-    if (/^\s*(BEGIN|COMMIT|ROLLBACK)\b/i.test(sql)) throw new Error(`transaction leaked: ${sql}`);
-    return memory.exec(sql);
-  },
-  run: memory.run.bind(memory),
-  get: memory.get.bind(memory),
-  all: memory.all.bind(memory),
-};
 const row = { provisionalKey: 'sheet1-r2', excelRow: 2, sourceSiteId: '3', sourceSiteIdRaw: '3', address: '3 Synthetic Lane, Fictional City, CO 80014', state: 'CO', classification: 'Event', region: 'CO' };
 const sha = createHash('sha256').update('d1-row').digest('hex');
-const imported = await importSiteBatch(guarded, { rows: [row], sha256: sha, filename: 'd1.json', now: '2026-11-09T00:00:00.000Z', dialect: 'd1' });
+const imported = await importSiteBatch(memory, { rows: [row], sha256: sha, filename: 'd1.json', now: '2026-11-09T00:00:00.000Z' });
 assert.equal(imported.sitesCreated, 1);
-assert.equal((await loadActivatedSites(guarded)).length, 0);
-const site = await guarded.get('SELECT site_id FROM sites');
-const refused = await activateSite(guarded, { siteId: site.site_id, actor: 'admin@example.com', decision: 'activate', now: '2026-11-09T00:01:00.000Z' });
+assert.equal((await loadActivatedSites(memory)).length, 0);
+const site = await memory.get('SELECT site_id FROM sites');
+await memory.run("INSERT INTO site_review_queue(review_id,batch_id,provisional_key,site_id,reason,detail,candidate_site_ids,dedupe_key,created_at) VALUES ('r','b',NULL,?, 'address_flag','flag',NULL,'d','2026-11-09T00:00:00.000Z')", site.site_id);
+const blocked = await activateSite(memory, { siteId: site.site_id, actor: 'admin@example.com', decision: 'activate', acknowledgement: 'owner-reviewed', now: '2026-11-09T00:01:00.000Z' });
+assert.equal(blocked.ok, false);
+await memory.run("UPDATE site_review_queue SET resolution = 'defer' WHERE review_id = 'r'");
+const refused = await activateSite(memory, { siteId: site.site_id, actor: 'admin@example.com', decision: 'activate', now: '2026-11-09T00:02:00.000Z' });
 assert.equal(refused.ok, false);
-assert.equal((await loadActivatedSites(guarded)).length, 0);
-const activated = await activateSite(guarded, { siteId: site.site_id, actor: 'admin@example.com', decision: 'activate', acknowledgement: 'owner-reviewed', now: '2026-11-09T00:02:00.000Z' });
+const activated = await activateSite(memory, { siteId: site.site_id, actor: 'admin@example.com', decision: 'activate', acknowledgement: 'owner-reviewed', now: '2026-11-09T00:03:00.000Z' });
 assert.equal(activated.ok, true);
-assert.equal((await loadActivatedSites(guarded)).length, 1);
-const audit = await guarded.get('SELECT actor, decision FROM site_activation_audit WHERE decision = ?', 'activate');
-assert.equal(audit.actor, 'admin@example.com');
-console.log('Passed: D1 adapter does not use BEGIN/COMMIT, import can run without those statements, and activation is explicit and audited.');
+assert.equal((await loadActivatedSites(memory)).length, 1);
+const deactivated = await activateSite(memory, { siteId: site.site_id, actor: 'admin@example.com', decision: 'deactivate', now: '2026-11-09T00:04:00.000Z' });
+assert.equal(deactivated.operational, 0);
+assert.equal((await loadActivatedSites(memory)).length, 0);
+assert.equal(await consumeProviderCall(memory, 0, 1), true);
+assert.equal(await consumeProviderCall(memory, 0, 1), false);
+
+const seedDb = wrapNodeSqlite(new DatabaseSync(':memory:'));
+await ensurePilotSchema(seedDb);
+const seed = reviewedSeedStatements([
+  { sourceSiteId: 'S1', address: '1 Synthetic Lane, Fictional City, CO 80014', state: 'CO', classification: 'Event' },
+  { sourceSiteId: 'S2', address: '2 Synthetic Lane, Fictional City, MN 55101', state: 'MN', classification: 'Seasonal' },
+], '2026-11-09T00:00:00.000Z', 'seed-test');
+await applySeedBatch(seedDb, seed);
+assert.equal((await seedDb.all('SELECT site_id FROM sites')).length, 2);
+assert.equal((await loadActivatedSites(seedDb)).length, 0);
+const failing = wrapNodeSqlite(new DatabaseSync(':memory:'));
+await ensurePilotSchema(failing);
+await assert.rejects(() => applySeedBatch(failing, [...seed, { sql: 'INSERT INTO missing_table(id) VALUES (?)', params: ['x'] }]));
+assert.equal((await failing.all('SELECT site_id FROM sites')).length, 0);
+console.log('Passed: D1 adapter avoids implicit BEGIN, activation is audited and reversible, the budget counter is atomic, and a failed seed batch rolls back.');

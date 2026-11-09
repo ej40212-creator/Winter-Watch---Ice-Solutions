@@ -19,7 +19,7 @@ const env = {
   ADMIN_EMAILS: 'admin@synthetic.winter-watch.invalid',
   ADMIN_GROUPS: 'winter-watch-admins',
 };
-const loaded = loadAccessConfig(env);
+const loaded = loadAccessConfig(env, { devBuild: true, forceSynthetic: true, staticJwks: JSON.parse(env.ACCESS_JWKS_JSON) });
 assert.equal(loaded.ok, true);
 const config = loaded.config;
 const now = Date.parse('2026-11-09T17:00:00Z');
@@ -39,7 +39,7 @@ async function token(extra = {}) {
 const missing = await authenticate(null, config, now);
 assert.equal(missing.status, 401);
 const forgedHeader = new Request('https://pilot.local/api/refresh', { headers: { 'oai-authenticated-user-id': 'forged-admin', 'cf-access-authenticated-user-email': 'admin@synthetic.winter-watch.invalid' } });
-const forged = await guardRequest(forgedHeader, env, now);
+const forged = await guardRequest(forgedHeader, env, now, { devBuild: true, forceSynthetic: true, staticJwks: JSON.parse(env.ACCESS_JWKS_JSON) });
 assert.equal(forged?.status, 401);
 
 const bad = await token();
@@ -58,8 +58,10 @@ assert.equal(admin.ok && admin.identity.admin, true);
 const grouped = await authenticate(await token({ groups: ['winter-watch-admins'] }), config, now);
 assert.equal(grouped.ok && grouped.identity.admin, true);
 
+const jwks = JSON.parse(env.ACCESS_JWKS_JSON);
+const guardOptions = { devBuild: true, forceSynthetic: true, staticJwks: jwks };
 async function asRole(pathname, jwt) {
-  return guardRequest(new Request(`https://pilot.local${pathname}`, { headers: { 'cf-access-jwt-assertion': jwt } }), env, now);
+  return guardRequest(new Request(`https://pilot.local${pathname}`, { headers: { 'cf-access-jwt-assertion': jwt } }), env, now, guardOptions);
 }
 assert.equal((await asRole('/api/performance', await token()))?.status, 403);
 assert.equal((await asRole('/mcp', await token()))?.status, 403);
@@ -67,22 +69,22 @@ assert.equal((await asRole('/api/refresh', await token()))?.status, 403);
 assert.equal(await asRole('/api/performance', await token({ email: 'admin@synthetic.winter-watch.invalid', sub: 'admin-1' })), null);
 assert.equal(await asRole('/', await token()), null);
 
-const noPolicy = loadAccessConfig({ ...env, ADMIN_EMAILS: '', ADMIN_GROUPS: '' });
+const noPolicy = loadAccessConfig({ ...env, ADMIN_EMAILS: '', ADMIN_GROUPS: '' }, { devBuild: true, forceSynthetic: true, staticJwks: JSON.parse(env.ACCESS_JWKS_JSON) });
 assert.equal(noPolicy.ok, true);
-const closed = await guardRequest(new Request('https://pilot.local/api/admin/review', { headers: { 'cf-access-jwt-assertion': await token({ email: 'admin@synthetic.winter-watch.invalid', sub: 'admin-1' }) } }), { ...env, ADMIN_EMAILS: '', ADMIN_GROUPS: '' }, now);
+const closed = await guardRequest(new Request('https://pilot.local/api/admin/review', { headers: { 'cf-access-jwt-assertion': await token({ email: 'admin@synthetic.winter-watch.invalid', sub: 'admin-1' }) } }), { ...env, ADMIN_EMAILS: '', ADMIN_GROUPS: '' }, now, guardOptions);
 assert.equal(closed?.status, 403);
 const unconfigured = await guardRequest(new Request('https://pilot.local/'), {}, now);
 assert.equal(unconfigured?.status, 503);
-const mixed = loadAccessConfig({ PILOT_SYNTHETIC_AUTH: '1', ACCESS_ISSUER: 'https://example.cloudflareaccess.com', ACCESS_AUD: 'real-aud', ACCESS_JWKS_JSON: env.ACCESS_JWKS_JSON }, { devBuild: true });
+const mixed = loadAccessConfig({ PILOT_SYNTHETIC_AUTH: '1', ACCESS_ISSUER: 'https://example.cloudflareaccess.com', ACCESS_AUD: 'real-aud' }, { devBuild: true, forceSynthetic: true, staticJwks: JSON.parse(env.ACCESS_JWKS_JSON) });
 assert.equal(mixed.ok, false);
 assert.equal(mixed.status, 503);
 const operatorJwt = await token();
-const forgedAndValid = await guardRequest(new Request('https://pilot.local/api/admin/review', { headers: { 'cf-access-jwt-assertion': operatorJwt, 'oai-authenticated-user-id': 'admin@synthetic.winter-watch.invalid' } }), env, now);
+const forgedAndValid = await guardRequest(new Request('https://pilot.local/api/admin/review', { headers: { 'cf-access-jwt-assertion': operatorJwt, 'oai-authenticated-user-id': 'admin@synthetic.winter-watch.invalid' } }), env, now, guardOptions);
 assert.equal(forgedAndValid?.status, 403);
-const reviewDenied = await guardRequest(new Request('https://pilot.local/api/admin/review', { headers: { 'cf-access-jwt-assertion': operatorJwt } }), env, now);
+const reviewDenied = await guardRequest(new Request('https://pilot.local/api/admin/review', { headers: { 'cf-access-jwt-assertion': operatorJwt } }), env, now, guardOptions);
 assert.equal(reviewDenied?.status, 403);
-const offHost = await guardRequest(new Request('https://example.com/api/pilot-session', { method: 'POST' }), { ...env, PILOT_SYNTHETIC_AUTH: '1' }, now, { devBuild: true });
+const offHost = await guardRequest(new Request('https://example.com/api/pilot-session', { method: 'POST' }), env, now, { ...guardOptions, devBuild: true });
 assert.equal(offHost?.status, 404);
-const offBuild = await guardRequest(new Request('http://127.0.0.1/api/pilot-session', { method: 'POST' }), { ...env, PILOT_SYNTHETIC_AUTH: '1' }, now, { devBuild: false });
+const offBuild = await guardRequest(new Request('http://127.0.0.1/api/pilot-session', { method: 'POST' }), env, now, { ...guardOptions, devBuild: false, forceSynthetic: false });
 assert.equal(offBuild?.status, 404);
 console.log('Passed: forged and missing identity, wrong audience and issuer, expiry, unsigned alg, role denial, forged header with a valid operator token, and synthetic sign-in rejected off loopback or off a dev build.');

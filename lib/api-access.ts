@@ -40,8 +40,9 @@ export function liveProvider(env: EnvBag) {
 }
 
 export function syntheticForRequest(request: Request, env: EnvBag): boolean {
+  if (import.meta.env.DEV !== true) return false;
   const host = new URL(request.url).hostname;
-  return syntheticDataAllowed({ devBuild: devBuildFlag(), host, authFlag: env.PILOT_SYNTHETIC_AUTH, dataFlag: env.PILOT_SYNTHETIC_DATA });
+  return syntheticDataAllowed({ devBuild: true, host, authFlag: env.PILOT_SYNTHETIC_AUTH, dataFlag: env.PILOT_SYNTHETIC_DATA });
 }
 
 export const NOT_RUN = {

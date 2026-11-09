@@ -15,6 +15,9 @@ const tests = [
   "scripts/test-provider-failure.mjs",
   "scripts/test-jwks.mjs",
   "scripts/test-d1-activation.mjs",
+  "scripts/test-forecast-fetch.mjs",
+  "scripts/test-xlsx-reader.mjs",
+  "scripts/test-request-guards.mjs",
 ];
 let failed = 0;
 for (const test of tests) {

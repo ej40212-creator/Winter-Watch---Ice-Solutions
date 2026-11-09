@@ -29,7 +29,7 @@ Suggested worker vars, all unset until the decisions above exist:
 - `SCHEDULER_ENABLED` left unset
 - `PROVIDER_REFRESH` left unset. Live Census/NWS/NOAA calls also require `PROVIDER_BUDGET` set to a positive integer. That value is intentionally unset here, so reads stay cache-only.
 - `REFRESH_DUE_AFTER_MS` left unset. Successful sites are held and reported, not silently dropped and not given an invented cadence.
-- `OPERATOR_RATE_LIMIT_PER_MINUTE` left unset. The worker then applies a safety ceiling of 30 requests per identity per minute. That ceiling is not a provider budget.
+- `OPERATOR_RATE_LIMIT_PER_MINUTE` left unset. When D1 is bound, the limit is a shared `identity_rate` counter. When D1 is not bound, the same ceiling is per isolate and the in-memory map drops windows older than two minutes. Live provider calls never use that map; they require the D1 `provider_budget` counter.
 - `ACCUWEATHER_RIGHTS_CONFIRMED` left unset
 - Do not set `PILOT_SYNTHETIC_AUTH`, `PILOT_SYNTHETIC_DATA`, or `PILOT_SYNTHETIC_PRIVATE_JWK` on a deployment. Production builds omit them, and synthetic sign-in is compiled out unless `import.meta.env.DEV` is true and the host is loopback.
 

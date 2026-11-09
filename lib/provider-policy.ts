@@ -26,7 +26,15 @@ export function rateLimitPerMinute(env: { OPERATOR_RATE_LIMIT_PER_MINUTE?: strin
 
 const buckets = new Map<string, { windowStart: number; count: number }>();
 
+/**
+ * Per-isolate fallback used only when D1 is not bound.
+ * Live provider calls do not use this map; they require the D1 budget counter.
+ * Cache-read limiting is per isolate in that fallback because there is no shared store.
+ * Entries older than two minutes are removed on each call.
+ */
 export function consumeIdentityRate(identity: string, now: number, limit: number, store = buckets): { allowed: boolean; remaining: number } {
+  const cutoff = now - 120_000;
+  for (const [key, value] of store) if (value.windowStart < cutoff) store.delete(key);
   const windowStart = now - (now % 60_000);
   const key = `${identity}|${windowStart}`;
   const current = store.get(key) ?? { windowStart, count: 0 };

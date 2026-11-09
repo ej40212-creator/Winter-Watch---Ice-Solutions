@@ -124,6 +124,18 @@ CREATE TABLE IF NOT EXISTS site_activation_audit (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS provider_budget (
+  period_start INTEGER PRIMARY KEY,
+  spent INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS identity_rate (
+  identity TEXT NOT NULL,
+  window_start INTEGER NOT NULL,
+  count INTEGER NOT NULL,
+  PRIMARY KEY (identity, window_start)
+);
+
 CREATE TABLE IF NOT EXISTS site_refresh_state (
   site_id TEXT PRIMARY KEY,
   last_attempt_at TEXT,

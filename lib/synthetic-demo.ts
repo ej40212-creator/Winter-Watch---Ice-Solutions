@@ -121,6 +121,3 @@ export function syntheticReview() {
   };
 }
 
-export function syntheticEnabled(workerEnv?: { PILOT_SYNTHETIC_DATA?: string }): boolean {
-  return workerEnv?.PILOT_SYNTHETIC_DATA === "1" || process.env.PILOT_SYNTHETIC_DATA === "1";
-}

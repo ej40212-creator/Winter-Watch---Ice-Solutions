@@ -1,7 +1,11 @@
 import { env } from 'cloudflare:workers';
 import { validAlert } from './risk';
 import {recordRefresh} from './telemetry';
-import { acceptGridForecast, buildFailureRecord, buildOutlookRecord, outlookCacheKey, planForecastFetches, providerFailureMessage, sharedCacheAllows } from './cache-policy';
+import { acceptGridForecast, buildFailureRecord, buildOutlookRecord, outlookCacheKey, planForecastFetches, sharedCacheAllows } from './cache-policy';
+import { fetchProviderJson } from './forecast-run';
+import { consumeProviderCall } from './provider-budget';
+import { providerDecision } from './provider-policy';
+import { wrapD1 } from './sql-d1';
 import type { SiteRecord } from './sites-data';
 const db=()=> (env as any).DB as D1Database;
 const BLOCKED='Live provider refresh is not authorized, or PROVIDER_BUDGET is unset. No provider call was made.';
@@ -22,17 +26,8 @@ export async function json(url:string,ttl:number,allowLive=false){
  if(!allowLive)throw Error(BLOCKED);
  if(inflight.has(url))return inflight.get(url)!;
  const task=(async()=>{
-  let response:Response|undefined, aborted=false;
-  for(let attempt=0;attempt<2;attempt++){
-   try{
-    response=await fetch(url,{headers:{'User-Agent':'IceSolutionsWinterWatch (https://myicesolutions.com)','Accept':'application/geo+json, application/json'},signal:AbortSignal.timeout(16000)});
-    aborted=false;
-   }catch{aborted=true;response=undefined;}
-   if(response?.ok)break;
-   if(response&&(response.status===429||response.status<500))break;
-  }
-  if(!response?.ok)throw Error(providerFailureMessage({status:response?.status,aborted}));
-  return save('url:'+url,await response.json(),ttl);
+  const body=await fetchProviderJson({url,allowLive:true,consume:()=>takeBudget()});
+  return save('url:'+url,body,ttl);
  })();inflight.set(url,task);try{return await task;}finally{inflight.delete(url);}
 }
 export async function resolveLocation(key:string, allowLive=false, sites?:SiteRecord[]){
@@ -52,19 +47,14 @@ export async function nationalAlerts(allowLive=false){const data=await json('htt
 async function fetchCached(url:string,ttl:number,key:string,allowLive:boolean){
  const known=await cached(key); if(known)return known;
  if(!allowLive)throw Error(BLOCKED);
- let response:Response|undefined, aborted=false;
- for(let attempt=0;attempt<2;attempt++){
-  try{
-   response=await fetch(url,{headers:{'User-Agent':'IceSolutionsWinterWatch (https://myicesolutions.com)','Accept':'application/geo+json, application/json'},signal:AbortSignal.timeout(16000)});
-   aborted=false;
-  }catch{aborted=true;response=undefined;}
-  if(response?.ok)break;
-  if(response&&(response.status===429||response.status<500))break;
- }
- if(!response?.ok)throw Error(providerFailureMessage({status:response?.status,aborted}));
- const body=await response.json();
+ const body=await fetchProviderJson({url,allowLive:true,consume:()=>takeBudget()});
  acceptGridForecast(key,body);
  return save(key,body,ttl);
+}
+async function takeBudget(){
+ const decision=providerDecision(env as {PROVIDER_REFRESH?:string;PROVIDER_BUDGET?:string});
+ if(!decision.allowLive||decision.budget==null) return false;
+ return consumeProviderCall(wrapD1(db()), Date.now(), decision.budget);
 }
 export async function readOutlook(key:string){return cached(outlookCacheKey(key),false);}
 export async function forecast(key:string, options:{allowLive?:boolean;sites?:SiteRecord[]}={}) {

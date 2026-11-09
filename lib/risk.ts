@@ -32,6 +32,7 @@ export function summarize(periods: any[], alerts: any[], now=Date.now(), horizon
  if(hours.some(h=>h.hazards.includes('Frost risk'))) priority=Math.max(priority,1);
  const triggers=hours.filter(h=>h.hazards.length);
  const firstTimes=[...triggers.map(h=>Math.max(now,Date.parse(h.time))),...active.map(a=>Math.max(now,Date.parse(a.onset||a.effective)))].filter(Number.isFinite);
- const complete=hours.length>=horizon-1 && Date.parse(hours.at(-1)?.end||'')>=end-60000 && hours.every(h=>h.temp!==null&&h.dew!==null&&h.rh!==null&&h.pop!==null&&h.summary);
+ const gap=hours.some((h,i)=>i>0 && Date.parse(h.time)>Date.parse(hours[i-1].end)+60000);
+ const complete=!gap && hours.length>=horizon-1 && Date.parse(hours.at(-1)?.end||'')>=end-60000 && hours.every(h=>h.temp!==null&&h.dew!==null&&h.rh!==null&&h.pop!==null&&h.summary);
  return {hours,alerts:active,priority,complete,coverageEnd:hours.at(-1)?.end||null,missingFields:[...new Set(hours.flatMap(h=>[h.temp===null?'temperature':null,h.dew===null?'dew point':null,h.rh===null?'humidity':null,h.pop===null?'precipitation chance':null,!h.summary?'weather description':null].filter(Boolean)))],onset:firstTimes.length?new Date(Math.min(...firstTimes)).toISOString():null,hazards:[...new Set(triggers.flatMap(h=>h.hazards))],minTemp:hours.some(h=>h.temp!==null)?Math.min(...hours.filter(h=>h.temp!==null).map(h=>h.temp!)):null};
 }

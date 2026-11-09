@@ -4,9 +4,6 @@ import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { sites } from "./build/sites-vite-plugin";
 import { connectorPreview } from "./build/connector-preview-plugin.mjs";
 
-const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
-  "00000000-0000-4000-8000-000000000000";
-
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const managedLinux = readExecutionProfile() === "managed-linux";
@@ -36,18 +33,12 @@ export default defineConfig(async ({ command }) => {
     compatibility_flags: ["nodejs_compat"],
     workers_dev: false,
     vars,
-    d1_databases: [
-      {
-        binding: "DB",
-        database_name: "winter-watch-pilot",
-        database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
-      },
-    ],
   };
   return {
     server: {
+      host: "127.0.0.1",
       ...(managedLinux
-        ? { host: "0.0.0.0", allowedHosts: ["terminal.local"] }
+        ? { allowedHosts: ["terminal.local"] }
         : {}),
       ...(isCodexSeatbeltSandbox
         ? { watch: { useFsEvents: false, usePolling: true } }
@@ -60,6 +51,7 @@ export default defineConfig(async ({ command }) => {
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,
+        configPath: "./wrangler.jsonc",
         config: {
           ...localBindingConfig,
           ...(command === "serve"

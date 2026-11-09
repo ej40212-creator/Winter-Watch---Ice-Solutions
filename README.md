@@ -10,7 +10,7 @@ The original ChatGPT Sites project id and `chatgpt.site` origin are not in this 
 - The runnable UI loads six clearly labeled synthetic sites from `fixtures/synthetic-sites.json`. The source workbook is not in the client bundle.
 - With `PILOT_SYNTHETIC_DATA=1`, weather and observations are simulated fixtures. The screen says so.
 - Synthetic sign-in is dev-build and loopback only. It is absent from the production wrangler config. It is not Cloudflare Access.
-- Real inventory import is an offline tool. Imported sites stay `pending_review` and `operational = 0` until a person activates them. Nothing in this pilot activates them.
+- Real inventory import is an offline tool. Imported sites stay `pending_review` and `operational = 0` until an admin records `owner-reviewed` on `POST /api/admin/sites`. No site in this repository has been activated. Identical content rows share one site id. Repeated ids with different addresses stay separate.
 
 ## Checks
 

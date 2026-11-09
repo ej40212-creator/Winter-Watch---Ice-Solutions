@@ -50,7 +50,7 @@ const hanging = (_url, init) => new Promise((_resolve, reject) => {
 });
 const timedOut = await authenticate(token, loaded.config, now, hanging);
 assert.equal(timedOut.ok, false);
-assert.equal(timedOut.status, 401);
+assert.equal(timedOut.status, 503);
 const noKid = token.split('.');
 const header = JSON.parse(Buffer.from(noKid[0], 'base64url').toString());
 delete header.kid;

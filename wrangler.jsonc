@@ -1,5 +1,6 @@
 {
-  "name": "ice-solutions-winter-watch-private-pilot",
+  "name": "ice-solutions-winter-watch",
+  "main": "build/sites-worker.ts",
   "compatibility_date": "2026-05-15",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
@@ -7,8 +8,8 @@
     {
       "binding": "DB",
       "database_name": "winter-watch-pilot",
-      "database_id": "00000000-0000-4000-8000-000000000001",
-      "preview_database_id": "00000000-0000-4000-8000-000000000001"
+      "database_id": "00000000-0000-4000-8000-000000000000",
+      "preview_database_id": "00000000-0000-4000-8000-000000000000"
     }
   ]
 }

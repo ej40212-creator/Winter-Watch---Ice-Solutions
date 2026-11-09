@@ -11,7 +11,7 @@ export type RefreshOutcome = { ok: boolean; error?: string };
 
 export type CycleResult = {
   execution: "simulation" | "provider";
-  status: "busy" | "completed" | "empty";
+  status: "busy" | "completed" | "empty" | "abandoned";
   cycleId: string | null;
   busy: boolean;
   batchLimit: number;
@@ -88,7 +88,8 @@ export async function runBoundedCycle(
   const clock = input.clock ?? (() => Date.now());
   const owner = input.owner ?? ulid(now);
   const limit = Math.min(MAX_BATCH, Math.max(1, input.limit ?? MAX_BATCH));
-  const expires = now + LEASE_MS;
+  const leaseNow = clock();
+  const expires = leaseNow + LEASE_MS;
   const previous = await db.get<{ cycle_id: string | null; expires_at: number }>("SELECT cycle_id, expires_at FROM refresh_leases WHERE name = ?", LEASE_NAME);
   const acquired = await db.get<{ owner: string }>(
     `INSERT INTO refresh_leases(name, owner, expires_at, cycle_id) VALUES (?, ?, ?, NULL)
@@ -98,7 +99,7 @@ export async function runBoundedCycle(
     LEASE_NAME,
     owner,
     expires,
-    now,
+    leaseNow,
   );
   if (!acquired || acquired.owner !== owner) {
     return {
@@ -123,7 +124,7 @@ export async function runBoundedCycle(
   }
   let recoveredAbandonedJobs = 0;
   try {
-    recoveredAbandonedJobs = previous && previous.expires_at <= now ? await recoverExpiredCycle(db, previous.cycle_id, now) : 0;
+    recoveredAbandonedJobs = previous && previous.expires_at <= leaseNow ? await recoverExpiredCycle(db, previous.cycle_id, leaseNow) : 0;
     const states = await db.all<StateRow>("SELECT site_id, last_success_at, next_retry_at, failures FROM site_refresh_state");
     const stateById = new Map(states.map((row) => [row.site_id, row]));
     let heldForUnsetDueWindow = 0;
@@ -159,17 +160,22 @@ export async function runBoundedCycle(
     let skipped = 0;
     const failures: CycleResult["failures"] = [];
     let cursor = 0;
+    let lostLease = false;
     const workers = Math.max(1, Math.min(input.concurrency ?? 4, batch.length || 1));
     async function worker() {
       while (cursor < batch.length) {
         const siteId = batch[cursor++]!;
+        const tick = clock();
         const owned = await db.run(
           "UPDATE refresh_leases SET expires_at = ? WHERE name = ? AND owner = ?",
-          now + LEASE_MS,
+          tick + LEASE_MS,
           LEASE_NAME,
           owner,
         );
-        if (!owned.changes) break;
+        if (!owned.changes) {
+          lostLease = true;
+          break;
+        }
         const effectToken = `${cycleId}:${siteId}`;
         const startedAtJob = iso(clock());
         const inserted = await db.run(
@@ -190,13 +196,24 @@ export async function runBoundedCycle(
         try {
           const outcome = await input.refreshSite(siteId, effectToken);
           const finishedAt = iso(clock());
-          await db.run(
-            "INSERT INTO refresh_effects(effect_token, site_id, applied_at) VALUES (?,?,?) ON CONFLICT(effect_token) DO NOTHING",
-            effectToken,
-            siteId,
-            finishedAt,
-          );
+          const still = await db.get<{ owner: string }>("SELECT owner FROM refresh_leases WHERE name = ?", LEASE_NAME);
+          if (!still || still.owner !== owner) {
+            lostLease = true;
+            await db.run(
+              "UPDATE refresh_jobs SET status = 'abandoned', finished_at = ?, error = 'lease lost during the provider call' WHERE cycle_id = ? AND site_id = ?",
+              finishedAt,
+              cycleId,
+              siteId,
+            );
+            break;
+          }
           if (outcome.ok) {
+            await db.run(
+              "INSERT INTO refresh_effects(effect_token, site_id, applied_at) VALUES (?,?,?) ON CONFLICT(effect_token) DO NOTHING",
+              effectToken,
+              siteId,
+              finishedAt,
+            );
             ok += 1;
             await db.run(
               "UPDATE refresh_jobs SET status = 'ok', finished_at = ?, attempt = ? WHERE cycle_id = ? AND site_id = ?",
@@ -267,18 +284,21 @@ export async function runBoundedCycle(
       }
     }
     await Promise.all(Array.from({ length: workers }, () => worker()));
-    const finishedAt = iso(input.now);
+    const finishedAt = iso(clock());
+    const cycleStatus = lostLease ? "abandoned" : batch.length ? "completed" : "empty";
     await db.run(
-      "UPDATE refresh_cycles SET status = 'completed', finished_at = ?, ok_count = ?, failed_count = ?, skipped_count = ? WHERE cycle_id = ?",
+      "UPDATE refresh_cycles SET status = ?, finished_at = ?, ok_count = ?, failed_count = ?, skipped_count = ?, note = COALESCE(note, '') || ? WHERE cycle_id = ?",
+      cycleStatus,
       finishedAt,
       ok,
       failed,
       skipped,
+      lostLease ? " Lease lost before the cycle finished." : "",
       cycleId,
     );
     return {
       execution: input.execution ?? "simulation",
-      status: batch.length ? "completed" : "empty",
+      status: cycleStatus,
       cycleId,
       busy: false,
       batchLimit: limit,

@@ -134,4 +134,41 @@ await runBoundedCycle(windowDb, { now: tick, siteIds: ['held-site'], execution: 
 const windowed = await runBoundedCycle(windowDb, { now: tick + 10_000, siteIds: ['held-site'], execution: 'simulation', refreshSite: async () => { throw new Error('should stay held'); } });
 assert.equal(windowed.processed, 0);
 assert.equal(windowed.heldForUnsetDueWindow, 1);
-console.log('Passed: scheduler lease, batch cap, backoff, expired-lease recovery, stolen lease, job timestamps, and unset due window. These cycles are simulated and did not call a provider.');
+
+let live = 10_000_000_000_000;
+const clock = () => live;
+const takeoverDb = await database();
+let releaseGate;
+const takeoverGate = new Promise((resolve) => { releaseGate = resolve; });
+const firstCalls = [];
+const running = runBoundedCycle(takeoverDb, {
+  now: live,
+  clock,
+  siteIds: ['slow', 'later'],
+  concurrency: 1,
+  execution: 'simulation',
+  refreshSite: async (siteId) => {
+    firstCalls.push(siteId);
+    if (siteId === 'slow') {
+      live += 181_000;
+      await takeoverGate;
+    }
+    return { ok: true };
+  },
+});
+await new Promise((resolve) => setTimeout(resolve, 40));
+const takeover = await runBoundedCycle(takeoverDb, {
+  now: live,
+  clock,
+  siteIds: ['other'],
+  execution: 'simulation',
+  refreshSite: async () => ({ ok: true }),
+});
+assert.equal(takeover.busy, false);
+assert.equal(takeover.status, 'completed');
+releaseGate();
+const abandoned = await running;
+assert.equal(abandoned.status, 'abandoned');
+const slowEffect = await takeoverDb.get("SELECT effect_token FROM refresh_effects WHERE site_id = 'slow'");
+assert.equal(slowEffect, undefined);
+console.log('Passed: scheduler lease, batch cap, backoff, expired-lease recovery, stolen lease, job timestamps, unset due window, and a live clock past 180s. These cycles are simulated and did not call a provider.');

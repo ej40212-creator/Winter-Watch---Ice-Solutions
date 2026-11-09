@@ -1,13 +1,16 @@
 import type { Sql } from "./sql.ts";
 
+type D1Statement = {
+  run(): Promise<{ meta?: { changes?: number } }>;
+  first<T>(): Promise<T | null>;
+  all<T>(): Promise<{ results?: T[] }>;
+};
+
 type D1Like = {
   exec(sql: string): Promise<unknown>;
+  batch?(statements: D1Statement[]): Promise<unknown>;
   prepare(sql: string): {
-    bind(...params: unknown[]): {
-      run(): Promise<{ meta?: { changes?: number } }>;
-      first<T>(): Promise<T | null>;
-      all<T>(): Promise<{ results?: T[] }>;
-    };
+    bind(...params: unknown[]): D1Statement;
   };
 };
 
@@ -28,6 +31,10 @@ export function wrapD1(db: D1Like): Sql {
     async all<T>(sql: string, ...params: unknown[]) {
       const result = await statement(sql, params).all<T>();
       return result.results ?? [];
+    },
+    async batch(statements) {
+      if (!db.batch) throw new Error("This D1 binding does not expose batch().");
+      await db.batch(statements.map((statement) => db.prepare(statement.sql).bind(...statement.params)));
     },
   };
 }
