@@ -1,0 +1,66 @@
+runtime_commit 171b37bf865039a57bf402ad8d60916eb65285b5
+server http://127.0.0.1:5173 bind 127.0.0.1
+SEED_ENDPOINT_ENABLED=enabled; empty local D1 with db/0001_pilot.sql; synthetic flags unset
+started 2026-11-09T19:07:09Z
+
+=== 1. good seed ===
++ 2026-11-09T19:07:09Z curl -sS -D - -X POST -H 'Origin: http://127.0.0.1:5173' -H 'content-type: application/json' -H 'Cf-Access-Jwt-Assertion: [redacted admin]' -H 'Cookie: CF_Authorization=[redacted]' --data-binary @/tmp/seed-a-post.json http://127.0.0.1:5173/api/admin/seed
+HTTP/1.1 200 OK
+Access-Control-Allow-Origin: http://127.0.0.1:5173
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 19:07:09 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"skipped":false,"counts":{"sites":1,"batches":1,"sourceRows":1,"reviews":1},"actor":"pilot-admin@example.com","execution":"database"}
+curl_exit:0
+
+=== 2. replay of the same file hash ===
++ 2026-11-09T19:07:09Z curl -sS -D - -X POST -H 'Origin: http://127.0.0.1:5173' -H 'content-type: application/json' -H 'Cf-Access-Jwt-Assertion: [redacted admin]' -H 'Cookie: CF_Authorization=[redacted]' --data-binary @/tmp/seed-a-post.json http://127.0.0.1:5173/api/admin/seed
+HTTP/1.1 200 OK
+Access-Control-Allow-Origin: http://127.0.0.1:5173
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 19:07:09 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"skipped":true,"counts":{"sites":1,"batches":1,"sourceRows":1,"reviews":1},"actor":"pilot-admin@example.com","execution":"database"}
+curl_exit:0
+
+=== 3. different seed on a non-empty database ===
++ 2026-11-09T19:07:09Z curl -sS -D - -X POST -H 'Origin: http://127.0.0.1:5173' -H 'content-type: application/json' -H 'Cf-Access-Jwt-Assertion: [redacted admin]' -H 'Cookie: CF_Authorization=[redacted]' --data-binary @/tmp/seed-b-post.json http://127.0.0.1:5173/api/admin/seed
+HTTP/1.1 409 Conflict
+Access-Control-Allow-Origin: http://127.0.0.1:5173
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 19:07:09 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"not_empty","message":"Apply a reviewed seed once to an empty D1 database."}
+curl_exit:0
+
+=== 4. active-site bypass ===
++ 2026-11-09T19:07:09Z curl -sS -D - -X POST -H 'Origin: http://127.0.0.1:5173' -H 'content-type: application/json' -H 'Cf-Access-Jwt-Assertion: [redacted admin]' -H 'Cookie: CF_Authorization=[redacted]' --data-binary @/tmp/seed-bypass.json http://127.0.0.1:5173/api/admin/seed
+HTTP/1.1 400 Bad Request
+Access-Control-Allow-Origin: http://127.0.0.1:5173
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 19:07:09 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"invalid_seed","message":"Seeded sites must stay pending_review and unactivated. Activation is a separate audited step."}
+curl_exit:0
+
+finished 2026-11-09T19:07:09Z
