@@ -1,6 +1,5 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
-import hostingConfig from "./.openai/hosting.json";
 import { readExecutionProfile } from "./scripts/execution-profile.mjs";
 import { sites } from "./build/sites-vite-plugin";
 import { connectorPreview } from "./build/connector-preview-plugin.mjs";
@@ -8,37 +7,12 @@ import { connectorPreview } from "./build/connector-preview-plugin.mjs";
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
 
-const { d1, r2 } = hostingConfig;
-
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const managedLinux = readExecutionProfile() === "managed-linux";
 
-const pilotVarNames = ["ACCESS_AUD", "ACCESS_ISSUER", "ACCESS_TEAM_DOMAIN", "ACCESS_JWKS_JSON", "ACCESS_JWKS_URL", "ADMIN_EMAILS", "ADMIN_GROUPS", "PILOT_SYNTHETIC_AUTH", "PILOT_SYNTHETIC_PRIVATE_JWK", "PILOT_SYNTHETIC_DATA", "SCHEDULER_ENABLED", "PROVIDER_REFRESH", "ACCUWEATHER_RIGHTS_CONFIRMED", "PILOT_PUBLIC_ORIGIN"] as const;
-const pilotVars = Object.fromEntries(pilotVarNames.flatMap((name) => process.env[name] ? [[name, process.env[name]]] : []));
-
-const localBindingConfig = {
-  main: "./build/sites-worker.ts",
-  compatibility_flags: ["nodejs_compat"],
-  vars: pilotVars,
-  d1_databases: d1
-    ? [
-        {
-          binding: d1,
-          database_name: "site-creator-d1",
-          database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
-        },
-      ]
-    : [],
-  r2_buckets: r2
-    ? [
-        {
-          binding: r2,
-          bucket_name: "site-creator-r2",
-        },
-      ]
-    : [],
-};
+const deployVarNames = ["ACCESS_AUD", "ACCESS_ISSUER", "ACCESS_TEAM_DOMAIN", "ACCESS_JWKS_URL", "ADMIN_EMAILS", "ADMIN_GROUPS", "SCHEDULER_ENABLED", "PROVIDER_REFRESH", "PROVIDER_BUDGET", "OPERATOR_RATE_LIMIT_PER_MINUTE", "REFRESH_DUE_AFTER_MS", "ACCUWEATHER_RIGHTS_CONFIRMED", "PILOT_PUBLIC_ORIGIN"] as const;
+const devOnlyVarNames = ["PILOT_SYNTHETIC_AUTH", "PILOT_SYNTHETIC_DATA", "PILOT_SYNTHETIC_PRIVATE_JWK", "ACCESS_JWKS_JSON"] as const;
 
 export default defineConfig(async ({ command }) => {
   // Use Miniflare's local Request.cf placeholder unless fetching is requested.
@@ -55,6 +29,21 @@ export default defineConfig(async ({ command }) => {
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
+  const names = command === "serve" ? [...deployVarNames, ...devOnlyVarNames] : deployVarNames;
+  const vars = Object.fromEntries(names.flatMap((name) => process.env[name] ? [[name, process.env[name]]] : []));
+  const localBindingConfig = {
+    main: "./build/sites-worker.ts",
+    compatibility_flags: ["nodejs_compat"],
+    workers_dev: false,
+    vars,
+    d1_databases: [
+      {
+        binding: "DB",
+        database_name: "winter-watch-pilot",
+        database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
+      },
+    ],
+  };
   return {
     server: {
       ...(managedLinux

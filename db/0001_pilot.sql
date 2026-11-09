@@ -115,6 +115,15 @@ CREATE TABLE IF NOT EXISTS refresh_effects (
   applied_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS site_activation_audit (
+  audit_id TEXT PRIMARY KEY,
+  site_id TEXT NOT NULL,
+  actor TEXT NOT NULL,
+  decision TEXT NOT NULL,
+  note TEXT,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS site_refresh_state (
   site_id TEXT PRIMARY KEY,
   last_attempt_at TEXT,

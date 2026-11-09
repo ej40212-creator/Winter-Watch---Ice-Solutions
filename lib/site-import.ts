@@ -78,6 +78,7 @@ export async function importSiteBatch(
     sourceSystem?: string;
     sheet?: string;
     operational?: boolean;
+    dialect?: "sqlite" | "d1";
   },
 ): Promise<ImportSummary> {
   await ensurePilotSchema(db);
@@ -97,8 +98,9 @@ export async function importSiteBatch(
   const status = input.operational ? "active" : "pending_review";
   const prepared: Prepared[] = input.rows.map((row) => ({
     ...row,
-    fp: contentFingerprint(row.sourceSiteId, row.state, row.address),
-    flags: row.state === "DC" ? [] : addressFlagReasons(row.address),
+    state: row.state.trim().toUpperCase(),
+    fp: contentFingerprint(row.sourceSiteId, row.state.trim().toUpperCase(), row.address),
+    flags: row.state.trim().toUpperCase() === "DC" ? [] : addressFlagReasons(row.address),
   }));
   const fpCount = new Map<string, number>();
   for (const row of prepared) fpCount.set(row.fp, (fpCount.get(row.fp) ?? 0) + 1);
@@ -108,7 +110,8 @@ export async function importSiteBatch(
   let sitesReused = 0;
   let reviewInserted = 0;
 
-  await db.exec("BEGIN");
+  const transactional = input.dialect !== "d1";
+  if (transactional) await db.exec("BEGIN");
   try {
     for (const row of prepared) {
       if (row.state === "DC") {
@@ -116,9 +119,29 @@ export async function importSiteBatch(
         continue;
       }
       if ((fpCount.get(row.fp) ?? 0) > 1) {
+        const fpMatches = await db.all<{ site_id: string }>(
+          "SELECT site_id FROM sites WHERE content_fp = ? AND source_system = ? AND status != 'excluded'",
+          row.fp,
+          sourceSystem,
+        );
+        if (fpMatches.length === 1) {
+          assignments.set(row, { siteId: fpMatches[0]!.site_id, method: "exact_fp", created: false });
+          sitesReused += 1;
+          continue;
+        }
+        if (fpMatches.length > 1) {
+          assignments.set(row, { siteId: null, method: "fp_collision", created: false });
+          continue;
+        }
+        const prior = [...assignments.entries()].find(([other, assignment]) => other.fp === row.fp && assignment.siteId);
+        if (prior) {
+          assignments.set(row, { siteId: prior[1]!.siteId, method: "exact_duplicate_reused", created: false });
+          sitesReused += 1;
+          continue;
+        }
         const siteId = ulid();
         await insertSite(db, row, siteId, sourceSystem, status, operational, now);
-        assignments.set(row, { siteId, method: "fp_collision_kept_separate", created: true });
+        assignments.set(row, { siteId, method: "exact_duplicate", created: true });
         sitesCreated += 1;
         continue;
       }
@@ -221,6 +244,21 @@ export async function importSiteBatch(
             detail: "New source row. It is not operational until an owner reviews it.",
             candidateSiteIds: assignment.siteId ? [assignment.siteId] : null,
             dedupeKey: assignment.siteId ?? row.fp,
+            createdAt: now,
+          })
+        ).changes;
+      }
+      if (assignment.method === "exact_duplicate" || assignment.method === "exact_duplicate_reused") {
+        reviewInserted += (
+          await queueReview(db, {
+            reviewId: ulid(),
+            batchId,
+            provisionalKey: row.provisionalKey,
+            siteId: assignment.siteId,
+            reason: "exact_duplicate",
+            detail: "Identical content rows share one site id. A later import reuses that id.",
+            candidateSiteIds: assignment.siteId ? [assignment.siteId] : null,
+            dedupeKey: row.fp,
             createdAt: now,
           })
         ).changes;
@@ -368,10 +406,10 @@ export async function importSiteBatch(
       "completed",
       JSON.stringify(summary),
     );
-    await db.exec("COMMIT");
+    if (transactional) await db.exec("COMMIT");
     return summary;
   } catch (error) {
-    await db.exec("ROLLBACK");
+    if (transactional) await db.exec("ROLLBACK");
     throw error;
   }
 }

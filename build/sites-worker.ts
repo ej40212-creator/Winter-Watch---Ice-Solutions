@@ -6,7 +6,7 @@ import { readRuntimeEnv } from "../lib/access-auth";
 
 export default {
   async fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
-    const blocked = await guardRequest(request, readRuntimeEnv(env));
+    const blocked = await guardRequest(request, readRuntimeEnv(env), Date.now(), { devBuild: import.meta.env?.DEV === true });
     if (blocked) return blocked;
     let binding = ctx.props?.CONNECTORS;
     // Local preview emulates the same request-scoped capability. This branch and

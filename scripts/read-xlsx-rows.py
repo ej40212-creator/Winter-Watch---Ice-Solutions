@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read the lineage workbook into contract rows. Prints JSON only. Does not log addresses."""
+"""Read a lineage workbook into contract rows. Prints JSON only. Does not log addresses."""
 import json
 import re
 import sys
@@ -7,10 +7,18 @@ import zipfile
 from xml.etree import ElementTree as ET
 
 NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+REQUIRED = {
+    "store #": "id",
+    "store address": "address",
+    "state": "state",
+    "classification": "classification",
+}
 
 
 def cell_value(cell, strings):
     kind = cell.attrib.get("t")
+    if kind == "inlineStr":
+        return "".join(node.text or "" for node in cell.findall(".//m:t", NS))
     node = cell.find("m:v", NS)
     if node is None or node.text is None:
         return ""
@@ -35,28 +43,42 @@ def main():
             for item in root.findall("m:si", NS):
                 strings.append("".join(node.text or "" for node in item.findall(".//m:t", NS)))
         sheet = ET.fromstring(workbook.read("xl/worksheets/sheet1.xml"))
-    rows = []
-    for row in sheet.findall("m:sheetData/m:row", NS):
+    rows = list(sheet.findall("m:sheetData/m:row", NS))
+    if not rows:
+        print("Workbook has no rows.", file=sys.stderr)
+        sys.exit(2)
+    header_cells = {}
+    for cell in rows[0].findall("m:c", NS):
+        column = re.match(r"[A-Z]+", cell.attrib["r"]).group(0)
+        header_cells[column] = cell_value(cell, strings).strip().lower()
+    fields = {}
+    for column, label in header_cells.items():
+        if label in REQUIRED:
+            fields[REQUIRED[label]] = column
+    missing = [name for name in REQUIRED.values() if name not in fields]
+    if missing:
+        print("Workbook header is missing: " + ", ".join(missing), file=sys.stderr)
+        sys.exit(2)
+    output = []
+    for row in rows[1:]:
         excel_row = int(row.attrib["r"])
         values = {}
         for cell in row.findall("m:c", NS):
             column = re.match(r"[A-Z]+", cell.attrib["r"]).group(0)
             values[column] = cell_value(cell, strings)
-        if excel_row == 1:
+        if not any(str(values.get(column, "")).strip() for column in fields.values()):
             continue
-        if not any(str(values.get(column, "")).strip() for column in "ABCDE"):
-            continue
-        source_id = canonical_id(values.get("A", ""))
-        state = str(values.get("C", "")).strip()
-        rows.append({
+        state = str(values.get(fields["state"], "")).strip()
+        source_id = canonical_id(values.get(fields["id"], ""))
+        output.append({
             "key": f"sheet1-r{excel_row}",
             "id": source_id,
             "region": state,
-            "address": str(values.get("B", "")),
+            "address": str(values.get(fields["address"], "")),
             "state": state,
-            "classification": str(values.get("D", "")),
+            "classification": str(values.get(fields["classification"], "")),
         })
-    json.dump(rows, sys.stdout)
+    json.dump(output, sys.stdout)
     sys.stdout.write("\n")
 
 

@@ -1,12 +1,31 @@
 import { retryDelay } from "./coverage.ts";
 import { summarize } from "./risk.ts";
 
+export function providerFailureMessage(input: { status?: number; aborted?: boolean }): string {
+  if (input.aborted) return "Weather provider timed out.";
+  if (input.status === 429) return "Weather provider rate limit; automatic retry scheduled.";
+  return `Weather provider temporarily unavailable (${input.status ?? "unknown"}).`;
+}
+
 export function gridCacheKey(gridUrl: string): string {
   return `grid-forecast-v1:${gridUrl}`;
 }
 
 export function pointAlertCacheKey(lat: number, lon: number): string {
   return `point-alerts-v1:${lat.toFixed(4)},${lon.toFixed(4)}`;
+}
+
+export function planForecastFetches(forecastHourly: string, lat: number, lon: number) {
+  return {
+    gridKey: gridCacheKey(forecastHourly),
+    alertKey: pointAlertCacheKey(lat, lon),
+    alertUrl: `https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}`,
+  };
+}
+
+export function acceptGridForecast(key: string, body: unknown): { key: string; body: unknown } {
+  if (!sharedCacheAllows(key, body)) throw new Error("Refusing to store point-specific alerts in a shared grid cache.");
+  return { key, body };
 }
 
 export function outlookCacheKey(siteId: string): string {
@@ -63,7 +82,7 @@ export function buildOutlookRecord(input: {
     updated: new Date(input.now).toISOString(),
     issued: input.issued,
     complete: summary.complete && input.alertsOk && !oldForecast,
-    status: !input.weatherOk ? "partial" : oldForecast ? "stale" : "ok",
+    status: !input.weatherOk || !input.alertsOk ? "partial" : oldForecast ? "stale" : "ok",
     error: !input.weatherOk ? "Hourly forecast unavailable." : !input.alertsOk ? "NWS alert check unavailable." : oldForecast ? "Forecast issue time is old or missing." : null,
     lastAttempt: new Date(input.now).toISOString(),
     failures,

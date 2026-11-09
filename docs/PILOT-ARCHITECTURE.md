@@ -30,7 +30,7 @@ Every non-asset request needs a verified RS256 JWT from `Cf-Access-Jwt-Assertion
 
 Admin, MCP, refresh, and performance routes also require an email or group on the server allowlist. If the allowlist is empty, those routes stay closed for everyone. If audience, issuer, or signing keys are missing, the response is `configuration_required` (503), not an open app.
 
-`PILOT_SYNTHETIC_AUTH=1` is accepted only for issuer `https://synthetic.winter-watch.invalid` and audience `synthetic-pilot`. It still verifies a signature. It is a local harness. A successful local request is not a Cloudflare Access validation.
+Synthetic sign-in is compiled only into dev builds (`import.meta.env.DEV`), and the request host must be loopback. A production bundle returns 404 for `/api/pilot-session` even if `PILOT_SYNTHETIC_AUTH=1`. The production wrangler config does not receive `PILOT_SYNTHETIC_*` or a private key. A local success is not a Cloudflare Access validation. Deployed JWKS loading uses the team certs URL; static `ACCESS_JWKS_JSON` cannot override that URL.
 
 ## Cache
 

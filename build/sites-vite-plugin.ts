@@ -174,13 +174,11 @@ export function sites({ mockAuth = true } = {}): Plugin {
       if (command !== "build") return;
 
       const outputDirectory = resolve(root, "dist", ".openai");
-      const hostingConfig = resolve(root, ".openai", "hosting.json");
       const drizzleSource = resolve(root, "drizzle");
 
       await rm(outputDirectory, { recursive: true, force: true });
+      if (!(await exists(drizzleSource))) return;
       await mkdir(outputDirectory, { recursive: true });
-
-      await cp(hostingConfig, resolve(outputDirectory, "hosting.json"));
       if (await exists(drizzleSource)) {
         await cp(drizzleSource, resolve(outputDirectory, "drizzle"), {
           recursive: true,

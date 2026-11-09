@@ -39,6 +39,10 @@ next-env.d.ts
 tsconfig.tsbuildinfo
 /dist/
 *.pilot.sqlite
+*.sqlite
+*.xlsx
+*.csv
+provisional*.json
 /data-private/
 /.wrangler/
 # Checkout-local execution profile and tool state; never publish them.

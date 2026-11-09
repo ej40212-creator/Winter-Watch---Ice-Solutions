@@ -64,7 +64,21 @@ const originalAddress = (await db.get('SELECT address FROM sites WHERE source_si
 await importSiteBatch(db, { rows: changed, sha256: sha(changed), filename: 'changed.json', now: '2026-11-09T04:00:00.000Z' });
 assert.equal((await db.get('SELECT address FROM sites WHERE source_site_id = ?', '8')).address, originalAddress);
 assert.equal((await openReviewCounts(db)).address_changed, 1);
-console.log('Passed: repeated and shuffled imports preserve ids, duplicates stay separate, exclusions and flags remain, and absent rows are not deleted.');
+const dcSpaced = [{ ...base[5], state: ' dc ', region: ' dc ' }];
+const dcDb = database();
+await importSiteBatch(dcDb, { rows: dcSpaced, sha256: sha(dcSpaced), filename: 'dc.json', now: '2026-11-09T05:00:00.000Z' });
+assert.equal((await dcDb.all('SELECT site_id FROM sites')).length, 0);
+assert.equal((await openReviewCounts(dcDb)).coverage_excluded, 1);
+const dupRow = { provisionalKey: 'sheet1-r10', excelRow: 10, sourceSiteId: '15', sourceSiteIdRaw: '15', address: '15 Same Street, Fictional City, CO 80014', state: 'CO', classification: 'Event', region: 'CO' };
+const exact = [dupRow, { ...dupRow, provisionalKey: 'sheet1-r11', excelRow: 11 }];
+const exactDb = database();
+const firstExact = await importSiteBatch(exactDb, { rows: exact, sha256: sha(exact), filename: 'exact.json', now: '2026-11-09T06:00:00.000Z' });
+assert.equal(firstExact.sitesCreated, 1);
+const changedKeys = exact.map((row, index) => ({ ...row, provisionalKey: `sheet1-r${80 + index}`, excelRow: 80 + index }));
+const secondExact = await importSiteBatch(exactDb, { rows: changedKeys, sha256: sha(changedKeys), filename: 'exact-2.json', now: '2026-11-09T07:00:00.000Z' });
+assert.equal(secondExact.sitesCreated, 0);
+assert.equal((await exactDb.all('SELECT site_id FROM sites')).length, 1);
+console.log('Passed: repeated and shuffled imports preserve ids, duplicates stay separate, exclusions and flags remain, absent rows are not deleted, and exact duplicate rows keep one id.');
 
 if (process.env.WINTER_WATCH_XLSX) {
   const { spawnSync } = await import('node:child_process');

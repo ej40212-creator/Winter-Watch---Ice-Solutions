@@ -9,7 +9,7 @@ The original ChatGPT Sites project id and `chatgpt.site` origin are not in this 
 - The dashboard preserves the exported screening rules in `lib/risk.ts`, the outlook windows (24 / 48 / 72 / 168 hours), and the Ice Solutions branding.
 - The runnable UI loads six clearly labeled synthetic sites from `fixtures/synthetic-sites.json`. The source workbook is not in the client bundle.
 - With `PILOT_SYNTHETIC_DATA=1`, weather and observations are simulated fixtures. The screen says so.
-- With `PILOT_SYNTHETIC_AUTH=1`, local sign-in uses a synthetic issuer (`https://synthetic.winter-watch.invalid`) and still verifies an RS256 JWT. That mode is not Cloudflare Access.
+- Synthetic sign-in is dev-build and loopback only. It is absent from the production wrangler config. It is not Cloudflare Access.
 - Real inventory import is an offline tool. Imported sites stay `pending_review` and `operational = 0` until a person activates them. Nothing in this pilot activates them.
 
 ## Checks

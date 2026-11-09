@@ -1,10 +1,12 @@
-import { env } from "cloudflare:workers";
 import { performanceHistory } from "../../../lib/telemetry";
-import { syntheticEnabled } from "../../../lib/synthetic-demo";
 import { PRIVATE_NO_STORE } from "../../../lib/http";
+import { requireAdmin, syntheticForRequest } from "../../../lib/api-access";
+import { readRuntimeEnv } from "../../../lib/access-auth";
 
-export async function GET() {
-  if (syntheticEnabled(env as { PILOT_SYNTHETIC_DATA?: string })) {
+export async function GET(request: Request) {
+  const admin = await requireAdmin(request);
+  if (admin instanceof Response) return admin;
+  if (syntheticForRequest(request, readRuntimeEnv())) {
     return Response.json({
       checkedAt: new Date().toISOString(),
       buckets: [],

@@ -70,8 +70,8 @@ function bytesAsBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-export function loadAccessConfig(env: EnvBag): ConfigResult {
-  const synthetic = env.PILOT_SYNTHETIC_AUTH === "1";
+export function loadAccessConfig(env: EnvBag, options?: { devBuild?: boolean }): ConfigResult {
+  const synthetic = env.PILOT_SYNTHETIC_AUTH === "1" && options?.devBuild === true;
   const audience = env.ACCESS_AUD || (synthetic ? SYNTHETIC_AUDIENCE : "");
   const issuer = env.ACCESS_ISSUER || (env.ACCESS_TEAM_DOMAIN ? `https://${env.ACCESS_TEAM_DOMAIN}` : synthetic ? SYNTHETIC_ISSUER : "");
   if (synthetic && (issuer !== SYNTHETIC_ISSUER || audience !== SYNTHETIC_AUDIENCE)) {
@@ -90,8 +90,10 @@ export function loadAccessConfig(env: EnvBag): ConfigResult {
       message: "Cloudflare Access audience and issuer are not configured. Unsigned identity headers are ignored.",
     };
   }
+  const jwksUrl = env.ACCESS_JWKS_URL || (!synthetic && env.ACCESS_TEAM_DOMAIN ? `${issuer}/cdn-cgi/access/certs` : null);
+  const staticJsonAllowed = synthetic || !jwksUrl;
   let jwks: { keys: JsonWebKey[] } = { keys: [] };
-  if (env.ACCESS_JWKS_JSON) {
+  if (env.ACCESS_JWKS_JSON && staticJsonAllowed) {
     try {
       const parsed = JSON.parse(env.ACCESS_JWKS_JSON) as { keys?: JsonWebKey[] };
       if (!parsed || !Array.isArray(parsed.keys)) throw new Error("JWKS keys missing");
@@ -100,7 +102,6 @@ export function loadAccessConfig(env: EnvBag): ConfigResult {
       return { ok: false, status: 503, error: "configuration_required", message: "ACCESS_JWKS_JSON is not a JWKS document. Access stays closed." };
     }
   }
-  const jwksUrl = env.ACCESS_JWKS_URL || (!synthetic && env.ACCESS_TEAM_DOMAIN ? `${issuer}/cdn-cgi/access/certs` : null);
   if (!jwks.keys.length && !jwksUrl) {
     return {
       ok: false,
@@ -144,18 +145,54 @@ function decodeJson(segment: string): unknown {
   return JSON.parse(new TextDecoder().decode(b64urlToBytes(segment)));
 }
 
-async function jwkFor(header: { kid?: string; alg?: string }, config: AccessConfig, fetchJwks: typeof fetch): Promise<SigningJwk | null> {
-  if (header.alg !== "RS256") return null;
-  let keys = config.jwks.keys;
-  if (!keys.length && config.jwksUrl) {
-    const response = await fetchJwks(config.jwksUrl);
+const JWKS_TTL_MS = 10 * 60 * 1000;
+const jwksCache = new Map<string, { keys: SigningJwk[]; expires: number }>();
+
+export function resetJwksCache(): void {
+  jwksCache.clear();
+}
+
+function usableKey(key: SigningJwk): boolean {
+  return key.kty === "RSA" && !!key.kid && (!key.use || key.use === "sig");
+}
+
+async function fetchJwks(url: string, fetchImpl: typeof fetch, timeoutMs: number): Promise<SigningJwk[] | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetchImpl(url, { signal: controller.signal });
     if (!response.ok) return null;
-    const body = (await response.json()) as { keys?: JsonWebKey[] };
-    keys = body.keys ?? [];
+    const body = (await response.json()) as { keys?: SigningJwk[] };
+    if (!body || !Array.isArray(body.keys)) return null;
+    return body.keys.filter(usableKey);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
   }
-  const signingKeys = keys as SigningJwk[];
-  if (header.kid) return signingKeys.find((key) => key.kid === header.kid) ?? null;
-  return signingKeys.length === 1 ? signingKeys[0]! : null;
+}
+
+async function remoteKeys(config: AccessConfig, fetchImpl: typeof fetch, now: number, force: boolean): Promise<SigningJwk[] | null> {
+  if (!config.jwksUrl) return null;
+  const cached = jwksCache.get(config.jwksUrl);
+  if (!force && cached && cached.expires > now) return cached.keys;
+  const keys = await fetchJwks(config.jwksUrl, fetchImpl, 5000);
+  if (!keys) return cached?.keys ?? null;
+  jwksCache.set(config.jwksUrl, { keys, expires: now + JWKS_TTL_MS });
+  return keys;
+}
+
+async function jwkFor(header: { kid?: string; alg?: string }, config: AccessConfig, fetchImpl: typeof fetch, now: number): Promise<SigningJwk | null> {
+  if (header.alg !== "RS256" || !header.kid) return null;
+  const staticKeys = (config.jwksUrl && !config.synthetic ? [] : config.jwks.keys).filter(usableKey) as SigningJwk[];
+  const staticMatch = staticKeys.find((key) => key.kid === header.kid);
+  if (staticMatch && !config.jwksUrl) return staticMatch;
+  if (!config.jwksUrl) return null;
+  const first = await remoteKeys(config, fetchImpl, now, false);
+  const found = first?.find((key) => key.kid === header.kid);
+  if (found) return found;
+  const second = await remoteKeys(config, fetchImpl, now, true);
+  return second?.find((key) => key.kid === header.kid) ?? null;
 }
 
 export async function signAccessJwt(privateJwk: SigningJwk, payload: Record<string, unknown>): Promise<string> {
@@ -188,7 +225,7 @@ export async function authenticate(
   if (header.alg === "none" || header.alg !== "RS256") {
     return { ok: false, status: 401, error: "unauthorized", message: "The access token algorithm is not accepted." };
   }
-  const jwk = await jwkFor(header, config, fetchJwks);
+  const jwk = await jwkFor(header, config, fetchJwks, now);
   if (!jwk) return { ok: false, status: 401, error: "unauthorized", message: "The access token signing key is not trusted." };
   const key = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
   const valid = await crypto.subtle.verify(

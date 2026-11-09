@@ -1,12 +1,16 @@
 import { env } from "cloudflare:workers";
-import { syntheticEnabled, syntheticReview } from "../../../../lib/synthetic-demo";
+import { syntheticReview } from "../../../../lib/synthetic-demo";
 import { PRIVATE_NO_STORE } from "../../../../lib/http";
 import { wrapD1 } from "../../../../lib/sql-d1";
+import { requireAdmin, syntheticForRequest } from "../../../../lib/api-access";
+import { readRuntimeEnv } from "../../../../lib/access-auth";
 
 const ALLOWED = new Set(["keep_separate", "defer"]);
 
-export async function GET() {
-  if (syntheticEnabled(env as { PILOT_SYNTHETIC_DATA?: string })) {
+export async function GET(request: Request) {
+  const admin = await requireAdmin(request);
+  if (admin instanceof Response) return admin;
+  if (syntheticForRequest(request, readRuntimeEnv())) {
     return Response.json(syntheticReview(), { headers: PRIVATE_NO_STORE });
   }
   const database = (env as { DB?: D1Database }).DB;
@@ -24,11 +28,13 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const admin = await requireAdmin(request);
+  if (admin instanceof Response) return admin;
   const body = await request.json().catch(() => null) as { reviewId?: string; resolution?: string } | null;
   if (!body?.reviewId || !body.resolution || !ALLOWED.has(body.resolution)) {
     return Response.json({ error: "invalid_resolution", message: "Only keep_separate and defer are accepted. Duplicates are not merged and sites are not deleted." }, { status: 400, headers: PRIVATE_NO_STORE });
   }
-  if (syntheticEnabled(env as { PILOT_SYNTHETIC_DATA?: string })) {
+  if (syntheticForRequest(request, readRuntimeEnv())) {
     const item = syntheticReview().items.find((entry) => entry.reviewId === body.reviewId);
     if (!item) return Response.json({ error: "not_found" }, { status: 404, headers: PRIVATE_NO_STORE });
     return Response.json({ ...item, resolution: body.resolution, execution: "simulation", persisted: false }, { headers: PRIVATE_NO_STORE });
@@ -37,9 +43,10 @@ export async function POST(request: Request) {
   if (!database) return Response.json({ error: "configuration_required", message: "D1 is not configured." }, { status: 503, headers: PRIVATE_NO_STORE });
   const db = wrapD1(database);
   const result = await db.run(
-    "UPDATE site_review_queue SET resolution = ?, resolved_at = ? WHERE review_id = ? AND resolution IS NULL",
+    "UPDATE site_review_queue SET resolution = ?, resolved_at = ?, resolved_by = ? WHERE review_id = ? AND resolution IS NULL",
     body.resolution,
     new Date().toISOString(),
+    admin.identity.email,
     body.reviewId,
   );
   if (!result.changes) return Response.json({ error: "not_found", message: "That review item is not open." }, { status: 404, headers: PRIVATE_NO_STORE });

@@ -9,8 +9,8 @@ These items are still open after this increment. None of them is implied to be d
 | Duplicate pairs | The importer keeps both rows. It does not decide that a pair is one store. |
 | Leading zeros | The workbook stored store numbers as Excel integers. This import does not invent padding. |
 | Address corrections | Flagged rows are queued. No ZIP, city, or street correction is applied. |
-| Scheduler proof | Code covers a lease, a 40-site cap, backoff, and recovery in simulated tests. Two browser-closed hosted cycles with database readback have not run. |
-| Provider budget and cadence | Not selected. `/api/refresh` refuses live calls until `PROVIDER_REFRESH=authorized`. |
+| Scheduler proof | Lease, cap, backoff, stolen-lease stop, and recovery are covered by simulated tests. Two browser-closed hosted cycles with database readback have not run. Delivery is at-least-once if a provider call finishes and the process stops before the effect row is written. |
+| Provider budget and cadence | `PROVIDER_BUDGET` and `REFRESH_DUE_AFTER_MS` are unset on purpose. Live routes stay cache-only until both refresh authorization and a budget exist. |
 | AccuWeather | Disabled until a key and confirmed display rights both exist. |
 | Production claim | Not made. The local synthetic UI and the unit tests are the evidence in this change. |
 | Formal accessibility audit | Focus rings, non-color status text, stacked fields under 800px, and reduced motion are in the UI. A WCAG 2.2 AA audit, a 320px pass, and a 200% zoom pass were not completed. |

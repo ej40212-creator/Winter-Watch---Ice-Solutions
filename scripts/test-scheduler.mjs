@@ -99,4 +99,39 @@ const recovered = await runBoundedCycle(recoverDb, {
 assert.deepEqual(recoveredCalls, ['retry']);
 assert.equal(recovered.recoveredAbandonedJobs, 1);
 assert.equal((await recoverDb.get("SELECT status FROM refresh_cycles WHERE cycle_id = 'old'")).status, 'abandoned');
-console.log('Passed: scheduler lease, batch cap, backoff, and expired-lease recovery. These cycles are simulated and did not call a provider.');
+const other = await recoverDb.get("SELECT status FROM refresh_cycles WHERE cycle_id != 'old' AND status = 'abandoned'");
+assert.equal(other, undefined);
+
+const stealDb = await database();
+const stolen = [];
+await runBoundedCycle(stealDb, {
+  now: 1_700_000_000_000,
+  siteIds: ['first', 'second'],
+  concurrency: 1,
+  execution: 'simulation',
+  refreshSite: async (siteId) => {
+    stolen.push(siteId);
+    if (siteId === 'first') await stealDb.run("UPDATE refresh_leases SET owner = 'thief' WHERE name = 'fleet'");
+    return { ok: true };
+  },
+});
+assert.deepEqual(stolen, ['first']);
+
+let tick = 1_700_000_000_000;
+const clockDb = await database();
+await runBoundedCycle(clockDb, {
+  now: tick,
+  siteIds: ['timed'],
+  execution: 'simulation',
+  clock: () => { tick += 1000; return tick; },
+  refreshSite: async () => ({ ok: true }),
+});
+const timed = await clockDb.get('SELECT started_at, finished_at FROM refresh_jobs');
+assert.notEqual(timed.started_at, timed.finished_at);
+
+const windowDb = await database();
+await runBoundedCycle(windowDb, { now: tick, siteIds: ['held-site'], execution: 'simulation', refreshSite: async () => ({ ok: true }) });
+const windowed = await runBoundedCycle(windowDb, { now: tick + 10_000, siteIds: ['held-site'], execution: 'simulation', refreshSite: async () => { throw new Error('should stay held'); } });
+assert.equal(windowed.processed, 0);
+assert.equal(windowed.heldForUnsetDueWindow, 1);
+console.log('Passed: scheduler lease, batch cap, backoff, expired-lease recovery, stolen lease, job timestamps, and unset due window. These cycles are simulated and did not call a provider.');

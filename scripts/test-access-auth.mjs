@@ -73,7 +73,16 @@ const closed = await guardRequest(new Request('https://pilot.local/api/admin/rev
 assert.equal(closed?.status, 403);
 const unconfigured = await guardRequest(new Request('https://pilot.local/'), {}, now);
 assert.equal(unconfigured?.status, 503);
-const mixed = loadAccessConfig({ PILOT_SYNTHETIC_AUTH: '1', ACCESS_ISSUER: 'https://example.cloudflareaccess.com', ACCESS_AUD: 'real-aud', ACCESS_JWKS_JSON: env.ACCESS_JWKS_JSON });
+const mixed = loadAccessConfig({ PILOT_SYNTHETIC_AUTH: '1', ACCESS_ISSUER: 'https://example.cloudflareaccess.com', ACCESS_AUD: 'real-aud', ACCESS_JWKS_JSON: env.ACCESS_JWKS_JSON }, { devBuild: true });
 assert.equal(mixed.ok, false);
 assert.equal(mixed.status, 503);
-console.log('Passed: forged and missing identity, wrong audience and issuer, expiry, unsigned alg, role denial, and fail-closed config.');
+const operatorJwt = await token();
+const forgedAndValid = await guardRequest(new Request('https://pilot.local/api/admin/review', { headers: { 'cf-access-jwt-assertion': operatorJwt, 'oai-authenticated-user-id': 'admin@synthetic.winter-watch.invalid' } }), env, now);
+assert.equal(forgedAndValid?.status, 403);
+const reviewDenied = await guardRequest(new Request('https://pilot.local/api/admin/review', { headers: { 'cf-access-jwt-assertion': operatorJwt } }), env, now);
+assert.equal(reviewDenied?.status, 403);
+const offHost = await guardRequest(new Request('https://example.com/api/pilot-session', { method: 'POST' }), { ...env, PILOT_SYNTHETIC_AUTH: '1' }, now, { devBuild: true });
+assert.equal(offHost?.status, 404);
+const offBuild = await guardRequest(new Request('http://127.0.0.1/api/pilot-session', { method: 'POST' }), { ...env, PILOT_SYNTHETIC_AUTH: '1' }, now, { devBuild: false });
+assert.equal(offBuild?.status, 404);
+console.log('Passed: forged and missing identity, wrong audience and issuer, expiry, unsigned alg, role denial, forged header with a valid operator token, and synthetic sign-in rejected off loopback or off a dev build.');

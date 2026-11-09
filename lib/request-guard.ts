@@ -1,4 +1,6 @@
 import { authenticate, loadAccessConfig, readRuntimeEnv, type EnvBag } from "./access-auth.ts";
+import { isLoopbackHost } from "./loopback.ts";
+import { syntheticSessionsAllowed } from "./synthetic-gate.ts";
 
 const PUBLIC_PATHS = new Set([
   "/favicon.ico",
@@ -57,14 +59,16 @@ export function authResponse(request: Request, status: number, error: string, me
   return Response.json({ error, message }, { status, headers: { "cache-control": "private, no-store" } });
 }
 
-export async function guardRequest(request: Request, env: EnvBag, now = Date.now()): Promise<Response | null> {
+export async function guardRequest(request: Request, env: EnvBag, now = Date.now(), options?: { devBuild?: boolean }): Promise<Response | null> {
   const url = new URL(request.url);
   if (isPublicAsset(url.pathname)) return null;
-  const loaded = loadAccessConfig(env);
+  const devBuild = options?.devBuild === true;
+  const loaded = loadAccessConfig(env, { devBuild });
   if (url.pathname === "/api/pilot-session") {
-    if (!loaded.ok || !loaded.config.synthetic) {
-      return authResponse(request, 404, "not_found", "Local synthetic sign-in is disabled.");
+    if (!syntheticSessionsAllowed({ devBuild, host: url.hostname, authFlag: env.PILOT_SYNTHETIC_AUTH })) {
+      return authResponse(request, 404, "not_found", "Synthetic sign-in is not available on this build or host.");
     }
+    if (!isLoopbackHost(url.hostname)) return authResponse(request, 404, "not_found", "Synthetic sign-in is loopback-only.");
     return null;
   }
   if (!loaded.ok) return authResponse(request, loaded.status, loaded.error, loaded.message);

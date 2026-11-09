@@ -1,7 +1,17 @@
-import {winterGuidance} from '../../../lib/noaa';
-export async function GET(request:Request){
- const key=new URL(request.url).searchParams.get('key');
- if(!key)return Response.json({error:'Choose a site.'},{status:400});
- try{return Response.json(await winterGuidance(key),{headers:{'Cache-Control':'no-store'}});}
- catch(e){return Response.json({error:e instanceof Error?e.message:'Guidance unavailable.'},{status:503});}
+import { winterGuidance } from "../../../lib/noaa";
+import { PRIVATE_NO_STORE } from "../../../lib/http";
+import { NOT_RUN, prepareRead } from "../../../lib/api-access";
+
+export async function GET(request: Request) {
+  const key = new URL(request.url).searchParams.get("key");
+  if (!key) return Response.json({ error: "Choose a site." }, { status: 400, headers: PRIVATE_NO_STORE });
+  const gate = await prepareRead(request);
+  if (gate instanceof Response) return gate;
+  if (gate.synthetic) return Response.json({ error: "Synthetic mode did not call NOAA guidance.", execution: "simulation" }, { status: 503, headers: PRIVATE_NO_STORE });
+  if (!gate.allowLive) return Response.json({ ...NOT_RUN }, { status: 409, headers: PRIVATE_NO_STORE });
+  try {
+    return Response.json(await winterGuidance(key, true), { headers: PRIVATE_NO_STORE });
+  } catch (error) {
+    return Response.json({ error: error instanceof Error ? error.message : "Guidance unavailable.", execution: "provider" }, { status: 503, headers: PRIVATE_NO_STORE });
+  }
 }

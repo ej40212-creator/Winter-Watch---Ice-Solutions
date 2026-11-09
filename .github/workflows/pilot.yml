@@ -1,0 +1,23 @@
+name: pilot
+on:
+  pull_request:
+  push:
+    branches: [main, cursor/winter-watch-private-pilot-41d4]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: node scripts/scan-secrets.mjs
+      - run: pnpm build
+      - run: node scripts/check-build-config.mjs

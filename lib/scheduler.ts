@@ -25,6 +25,8 @@ export type CycleResult = {
   finishedAt: string | null;
   failures: { siteId: string; error: string; finishedAt: string }[];
   recoveredAbandonedJobs: number;
+  heldForUnsetDueWindow: number;
+  delivery: "at-least-once";
 };
 
 type StateRow = {
@@ -38,20 +40,22 @@ function iso(ms: number): string {
   return new Date(ms).toISOString();
 }
 
-async function recoverExpiredLease(db: Sql, now: number): Promise<number> {
-  const running = await db.all<{ cycle_id: string }>("SELECT cycle_id FROM refresh_cycles WHERE status = 'running'");
-  if (!running.length) return 0;
+async function recoverExpiredCycle(db: Sql, cycleId: string | null, now: number): Promise<number> {
+  if (!cycleId) return 0;
   await db.run(
-    "UPDATE refresh_cycles SET status = 'abandoned', finished_at = ?, note = 'lease expired before completion' WHERE status = 'running'",
+    "UPDATE refresh_cycles SET status = 'abandoned', finished_at = ?, note = 'lease expired before completion' WHERE cycle_id = ? AND status = 'running'",
     iso(now),
+    cycleId,
   );
-  const leased = await db.all<{ site_id: string }>("SELECT site_id FROM refresh_jobs WHERE status = 'leased'");
+  const leased = await db.all<{ site_id: string }>("SELECT site_id FROM refresh_jobs WHERE cycle_id = ? AND status = 'leased'", cycleId);
   await db.run(
-    "UPDATE refresh_jobs SET status = 'abandoned', finished_at = ?, error = 'lease expired before the job finished' WHERE status = 'leased'",
+    "UPDATE refresh_jobs SET status = 'abandoned', finished_at = ?, error = 'lease expired before the job finished' WHERE cycle_id = ? AND status = 'leased'",
     iso(now),
+    cycleId,
   );
   const finished = await db.all<{ site_id: string; finished_at: string | null }>(
-    "SELECT site_id, finished_at FROM refresh_jobs WHERE status = 'ok'",
+    "SELECT site_id, finished_at FROM refresh_jobs WHERE cycle_id = ? AND status = 'ok'",
+    cycleId,
   );
   for (const job of finished) {
     await db.run(
@@ -77,12 +81,15 @@ export async function runBoundedCycle(
     owner?: string;
     execution?: "simulation" | "provider";
     concurrency?: number;
+    clock?: () => number;
   },
 ): Promise<CycleResult> {
   const now = input.now;
+  const clock = input.clock ?? (() => Date.now());
   const owner = input.owner ?? ulid(now);
   const limit = Math.min(MAX_BATCH, Math.max(1, input.limit ?? MAX_BATCH));
   const expires = now + LEASE_MS;
+  const previous = await db.get<{ cycle_id: string | null; expires_at: number }>("SELECT cycle_id, expires_at FROM refresh_leases WHERE name = ?", LEASE_NAME);
   const acquired = await db.get<{ owner: string }>(
     `INSERT INTO refresh_leases(name, owner, expires_at, cycle_id) VALUES (?, ?, ?, NULL)
      ON CONFLICT(name) DO UPDATE SET owner = excluded.owner, expires_at = excluded.expires_at, cycle_id = NULL
@@ -110,18 +117,27 @@ export async function runBoundedCycle(
       finishedAt: null,
       failures: [],
       recoveredAbandonedJobs: 0,
+      heldForUnsetDueWindow: 0,
+      delivery: "at-least-once",
     };
   }
   let recoveredAbandonedJobs = 0;
   try {
-    recoveredAbandonedJobs = await recoverExpiredLease(db, now);
+    recoveredAbandonedJobs = previous && previous.expires_at <= now ? await recoverExpiredCycle(db, previous.cycle_id, now) : 0;
     const states = await db.all<StateRow>("SELECT site_id, last_success_at, next_retry_at, failures FROM site_refresh_state");
     const stateById = new Map(states.map((row) => [row.site_id, row]));
+    let heldForUnsetDueWindow = 0;
     const due = input.siteIds.filter((siteId) => {
       const state = stateById.get(siteId);
       if (!state) return true;
       if (state.next_retry_at != null && state.next_retry_at > now) return false;
-      if (state.last_success_at && (input.dueAfterMs == null || now - Date.parse(state.last_success_at) < input.dueAfterMs)) return false;
+      if (state.last_success_at) {
+        if (input.dueAfterMs == null) {
+          heldForUnsetDueWindow += 1;
+          return false;
+        }
+        return now - Date.parse(state.last_success_at) >= input.dueAfterMs;
+      }
       return true;
     });
     due.sort();
@@ -135,7 +151,7 @@ export async function runBoundedCycle(
       startedAt,
       due.length,
       limit,
-      input.dueAfterMs == null ? "No recurring due window is configured." : "dueAfterMs was supplied by the caller.",
+      input.dueAfterMs == null ? "Due window is unset. Successful sites are held, not forgotten. Delivery is at-least-once if a call finishes and the process stops before the effect row is written." : "dueAfterMs was supplied by the caller. Delivery is at-least-once across a crash.",
     );
     await db.run("UPDATE refresh_leases SET cycle_id = ? WHERE name = ? AND owner = ?", cycleId, LEASE_NAME, owner);
     let ok = 0;
@@ -147,41 +163,39 @@ export async function runBoundedCycle(
     async function worker() {
       while (cursor < batch.length) {
         const siteId = batch[cursor++]!;
+        const owned = await db.run(
+          "UPDATE refresh_leases SET expires_at = ? WHERE name = ? AND owner = ?",
+          now + LEASE_MS,
+          LEASE_NAME,
+          owner,
+        );
+        if (!owned.changes) break;
         const effectToken = `${cycleId}:${siteId}`;
+        const startedAtJob = iso(clock());
         const inserted = await db.run(
           `INSERT INTO refresh_jobs(cycle_id,site_id,status,attempt,started_at,finished_at,error,effect_token)
            VALUES (?,?,'leased',1,?,NULL,NULL,?)
            ON CONFLICT(cycle_id, site_id) DO NOTHING`,
           cycleId,
           siteId,
-          iso(input.now),
+          startedAtJob,
           effectToken,
         );
         if (!inserted.changes) {
           skipped += 1;
           continue;
         }
-        const effect = await db.run(
-          "INSERT INTO refresh_effects(effect_token, site_id, applied_at) VALUES (?,?,?) ON CONFLICT(effect_token) DO NOTHING",
-          effectToken,
-          siteId,
-          iso(input.now),
-        );
-        if (!effect.changes) {
-          skipped += 1;
-          await db.run(
-            "UPDATE refresh_jobs SET status = 'skipped', finished_at = ?, error = 'effect already recorded' WHERE cycle_id = ? AND site_id = ?",
-            iso(input.now),
-            cycleId,
-            siteId,
-          );
-          continue;
-        }
         const prior = stateById.get(siteId);
         const attempt = (prior?.failures ?? 0) + 1;
         try {
           const outcome = await input.refreshSite(siteId, effectToken);
-          const finishedAt = iso(input.now);
+          const finishedAt = iso(clock());
+          await db.run(
+            "INSERT INTO refresh_effects(effect_token, site_id, applied_at) VALUES (?,?,?) ON CONFLICT(effect_token) DO NOTHING",
+            effectToken,
+            siteId,
+            finishedAt,
+          );
           if (outcome.ok) {
             ok += 1;
             await db.run(
@@ -227,7 +241,7 @@ export async function runBoundedCycle(
         } catch (error) {
           failed += 1;
           const message = error instanceof Error ? error.message : "Provider refresh failed.";
-          const finishedAt = iso(input.now);
+          const finishedAt = iso(clock());
           failures.push({ siteId, error: message, finishedAt });
           const failuresCount = (prior?.failures ?? 0) + 1;
           await db.run(
@@ -278,6 +292,8 @@ export async function runBoundedCycle(
       finishedAt,
       failures,
       recoveredAbandonedJobs,
+      heldForUnsetDueWindow,
+      delivery: "at-least-once",
     };
   } finally {
     await db.run("DELETE FROM refresh_leases WHERE name = ? AND owner = ?", LEASE_NAME, owner);

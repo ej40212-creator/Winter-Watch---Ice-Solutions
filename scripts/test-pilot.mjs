@@ -13,6 +13,8 @@ const tests = [
   "scripts/test-horizons.mjs",
   "scripts/test-scheduler.mjs",
   "scripts/test-provider-failure.mjs",
+  "scripts/test-jwks.mjs",
+  "scripts/test-d1-activation.mjs",
 ];
 let failed = 0;
 for (const test of tests) {

@@ -1,5 +1,4 @@
 import {env} from 'cloudflare:workers';
-import sites from './sites-data';
 import {cached,save,json,resolveLocation} from './weather';
 import {normalizeAccu,type DailyResult} from './daily';
 
@@ -9,18 +8,18 @@ async function accuJSON(path:string,token:string){
  if(!response.ok)throw Error(response.status===401||response.status===403?'AccuWeather access is not authorized for this forecast.':response.status===429?'AccuWeather request allowance reached. Try again later.':'AccuWeather is temporarily unavailable.');
  return response.json() as Promise<any>;
 }
-export async function dailyForecast(key:string,provider:'nws'|'accuweather'):Promise<DailyResult>{
- if(!sites.some(s=>s.key===key&&s.state!=='DC'))return {provider,status:'unavailable',error:'Unknown site.'};
+export async function dailyForecast(key:string,provider:'nws'|'accuweather',allowLive=false):Promise<DailyResult>{
  const rightsConfirmed=(env as any).ACCUWEATHER_RIGHTS_CONFIRMED==='authorized';
  const token=rightsConfirmed?(env as any).ACCUWEATHER_API_KEY:undefined;
  if(provider==='accuweather'&&!token)return {provider,status:'not_connected',error:'AccuWeather is disabled until an authorized key and display rights are both configured. The external city link is a reference, not a live AccuWeather feed.'};
  const cacheKey=`daily-v1:${provider}:${key}`;
  const known=await cached(cacheKey);if(known)return known;
+ if(!allowLive)return {provider,status:'unavailable',error:'Live provider refresh is not authorized, or PROVIDER_BUDGET is unset. No provider call was made.'};
  try{
-  const loc=await location(key),updated=new Date().toISOString();
+  const loc=await location(key,true),updated=new Date().toISOString();
   if(provider==='nws'){
    if(!loc.forecast)throw Error('NWS daily forecasts are unavailable at this location.');
-   const result=await json(loc.forecast,900000),p=result.properties;
+   const result=await json(loc.forecast,900000,true),p=result.properties;
    if(!Array.isArray(p?.periods)||!p.periods.length)throw Error('NWS has not supplied daily forecast periods for this location.');
    const issued=p.updateTime||p.generatedAt||null;
    const stale=!issued||!Number.isFinite(Date.parse(issued))||Date.now()-Date.parse(issued)>12*3600000;
