@@ -1,0 +1,9 @@
+# Winter Watch refresh operations
+
+The Site MCP tool `refresh_weather_batch` requires authenticated Sites identity. It refreshes at most 40 due sites with six concurrent requests, saves results in D1, and returns remainingDue. Repeat until remainingDue is zero; if busy, another batch holds the three-minute D1 lease. Do not republish for data refreshes. Read `weather_refresh_status` afterward to verify checked totals and the persisted last-run timestamp. Report failures without changing coverage flags. An hourly cloud task is intended; the UI shows actual completion, never inferred scheduler health.
+
+NWS hourly JSON is cached by canonical grid forecast URL and concurrent requests for the same URL share one promise. Verified Census coordinates and NWS grid mappings are persisted per source address. Point alerts remain location-specific. Address inputs missing the state have their supplied state appended before Census matching; only a unique same-state result is accepted. Corrections verified against official Walmart listings are recorded in lib/address-corrections.json; unresolved records remain review items.
+
+Temporary failures retry with bounded 5/10/20/40/60-minute backoff. Address failures retry after 24 hours, or when the input address changes. Hourly scheduled refresh targets 55-minute-old checks. The UI separately labels sites ever checked and complete forecasts; its current-check threshold is 90 minutes, clearly disclosed. Forecast provider issue age remains capped at 12 hours, missing weather fields and failed alert checks remain incomplete, and full rolling-window coverage is required. Daily forecasts and radar do not satisfy hourly coverage.
+
+The background tools do not edit site addresses or other user configuration. No secrets are stored in this file. A cloud task must have the published Site's private plugin connected before using its tools. Verify a writer call and status readback before enabling a new schedule.

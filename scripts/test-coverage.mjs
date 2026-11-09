@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {coverageReasons,retryDelay} from '../lib/coverage.ts';
+const now=Date.parse('2026-11-05T12:00:00Z');
+const good={status:'ok',updated:new Date(now).toISOString(),alertsChecked:true,windows:{48:{complete:true,coverageEnd:new Date(now+48*3600000).toISOString(),missingFields:[]}}};
+assert.deepEqual(coverageReasons(good,48,now),[]);
+assert.deepEqual(coverageReasons(null,48,now),['Not checked yet']);
+assert(coverageReasons({...good,alertsChecked:false},48,now).includes('Alert check unavailable'));
+assert(coverageReasons(good,48,now+3600000).includes('Forecast ends before outlook'),'Rolling window must not reuse an old complete flag');
+assert(coverageReasons({...good,updated:new Date(now-91*60000).toISOString()},48,now).includes('Refresh overdue'));
+assert(coverageReasons({status:'error',failureKind:'address',updated:good.updated},48,now).includes('Address needs review'));
+assert.equal(retryDelay('temporary',1),300000);assert.equal(retryDelay('temporary',8),3600000);assert.equal(retryDelay('address',1),86400000);
+console.log('Passed: checked versus complete, missing alerts, rolling coverage, overdue data, address failures and bounded retry backoff.');
