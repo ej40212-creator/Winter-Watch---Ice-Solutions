@@ -1,0 +1,210 @@
+runtime_commit ae3674c35dca7e335967332190bda0b6e268ae5f
+server http://127.0.0.1:5173 bind 127.0.0.1
+synthetic_flags unset; PROVIDER_REFRESH unset; PROVIDER_BUDGET unset
+started 2026-11-09T18:24:01Z
+
+=== 1. no token ===
++ 2026-11-09T18:24:01Z curl -sS -D - http://127.0.0.1:5173/api/sites
+HTTP/1.1 401 Unauthorized
+Vary: Origin
+cache-control: private, no-store
+content-length: 81
+content-type: application/json
+Date: Mon, 09 Nov 2026 18:24:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"unauthorized","message":"A valid Cloudflare Access token is required."}
+curl_exit:0
+
+=== 2. forged oai header only ===
++ 2026-11-09T18:24:01Z curl -sS -D - -H 'oai-authenticated-user-id: someone' http://127.0.0.1:5173/api/sites
+HTTP/1.1 401 Unauthorized
+Vary: Origin
+cache-control: private, no-store
+content-length: 81
+content-type: application/json
+Date: Mon, 09 Nov 2026 18:24:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"unauthorized","message":"A valid Cloudflare Access token is required."}
+curl_exit:0
+
+=== 3. operator on /api/admin/review ===
++ 2026-11-09T18:24:01Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' http://127.0.0.1:5173/api/admin/review
+HTTP/1.1 403 Forbidden
+Vary: Origin
+cache-control: private, no-store
+content-length: 104
+content-type: application/json
+Date: Mon, 09 Nov 2026 18:24:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"forbidden","message":"This identity is not allowed to call admin, MCP, or refresh endpoints."}
+curl_exit:0
+
+=== 4. operator weather key for an unactivated site ===
++ 2026-11-09T18:24:01Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' 'http://127.0.0.1:5173/api/weather?key=syn-co-01'
+HTTP/1.1 404 Not Found
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:24:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"That site is not activated.","execution":"not_run"}
+curl_exit:0
+
+=== 5. operator weather snapshot ===
++ 2026-11-09T18:24:01Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' http://127.0.0.1:5173/api/weather
+HTTP/1.1 503 Service Unavailable
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:24:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Weather service is temporarily unavailable. Please retry.","execution":"not_run"}
+curl_exit:0
+
+=== 6. operator daily ===
++ 2026-11-09T18:24:01Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' http://127.0.0.1:5173/api/daily
+HTTP/1.1 400 Bad Request
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:24:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Choose a valid site and provider."}
+curl_exit:0
+
+=== 7. operator radar ===
++ 2026-11-09T18:24:01Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' http://127.0.0.1:5173/api/radar
+HTTP/1.1 400 Bad Request
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:24:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"Choose a site."}
+curl_exit:0
+
+=== 8. operator refresh POST, header only ===
++ 2026-11-09T18:24:01Z curl -sS -D - -X POST -H 'Cf-Access-Jwt-Assertion: [redacted operator]' -H 'content-type: application/json' --data '{}' http://127.0.0.1:5173/api/refresh
+HTTP/1.1 403 Forbidden
+Vary: Origin
+cache-control: private, no-store
+content-length: 104
+content-type: application/json
+Date: Mon, 09 Nov 2026 18:24:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"forbidden","message":"This identity is not allowed to call admin, MCP, or refresh endpoints."}
+curl_exit:0
+
+=== 9. admin refresh POST with cookie and assertion, no Origin ===
++ 2026-11-09T18:24:01Z curl -sS -D - -X POST -H 'Cf-Access-Jwt-Assertion: [redacted admin]' -H 'Cookie: CF_Authorization=[redacted]' -H 'content-type: application/json' --data '{}' http://127.0.0.1:5173/api/refresh
+HTTP/1.1 403 Forbidden
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:24:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"forbidden","message":"The request origin is not accepted."}
+curl_exit:0
+
+=== 10. admin refresh POST, header only ===
++ 2026-11-09T18:24:01Z curl -sS -D - -X POST -H 'Cf-Access-Jwt-Assertion: [redacted admin]' -H 'content-type: application/json' --data '{}' http://127.0.0.1:5173/api/refresh
+HTTP/1.1 409 Conflict
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:24:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"status":"not_authorized","execution":"not_run","busy":false,"completed":0,"remainingDue":null,"message":"Live provider refresh is not authorized. No sites were fetched. Refresh cadence and provider budget are unset deployment decisions.","reason":"refresh_not_authorized"}
+curl_exit:0
+
+=== 11. operator sites list ===
++ 2026-11-09T18:24:01Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' http://127.0.0.1:5173/api/sites
+HTTP/1.1 503 Service Unavailable
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:24:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"mode":"empty","execution":"not_run","error":"configuration_required","message":"D1 is bound but the pilot schema is not applied, or the sites query failed. No site rows were returned."}
+curl_exit:0
+
+=== 12. dev pilot-session without a local private key ===
++ 2026-11-09T18:24:01Z curl -sS -D - -X POST -H 'content-type: application/json' --data '{}' http://127.0.0.1:5173/api/pilot-session
+HTTP/1.1 503 Service Unavailable
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:24:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"configuration_required","message":"The local synthetic signing key is not configured."}
+curl_exit:0
+
+finished 2026-11-09T18:24:01Z
+
+=== 13. operator daily for an unactivated key ===
++ 2026-11-09T18:24:28Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' 'http://127.0.0.1:5173/api/daily?key=syn-co-01&provider=nws'
+HTTP/1.1 503 Service Unavailable
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:24:28 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"provider":"nws","status":"unavailable","execution":"not_run","error":"Live provider refresh is not authorized, or PROVIDER_BUDGET is unset. No provider call was made."}
+curl_exit:0
+
+=== 14. operator radar for an unactivated key, live refresh unset ===
++ 2026-11-09T18:24:28Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' 'http://127.0.0.1:5173/api/radar?key=syn-co-01'
+HTTP/1.1 409 Conflict
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:24:28 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"execution":"not_run","error":"Live provider refresh is not authorized, or PROVIDER_BUDGET is unset. No provider call was made."}
+curl_exit:0
+
+=== notes ===
+Section 11 is HTTP 503 because wrangler.jsonc binds D1 for local dev, and that local database does not have db/0001_pilot.sql applied. loadActivatedSites throws, and /api/sites returns configuration_required. No site rows were invented.
+Section 5 is the same missing weather_cache table. snapshot() throws, the route catch returns 503, and no outlook or address is included.
+Section 4 is 404 because cache reads are limited to activated sites. This dev database has no activated rows.
+Section 9 shows a cookie-authenticated write is rejected without Origin even when Cf-Access-Jwt-Assertion is also present.
+Section 12 exists only because this is the dev server. The production bundle check fails if the pilot-session route or PILOT_SYNTHETIC remains.
+Tokens were redacted. curl_exit is the curl process status, not the HTTP status.
