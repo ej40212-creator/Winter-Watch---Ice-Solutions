@@ -39,6 +39,7 @@ const ENV_KEYS = [
   "REFRESH_DUE_AFTER_MS",
   "ACCUWEATHER_RIGHTS_CONFIRMED",
   "PILOT_PUBLIC_ORIGIN",
+  "SEED_ENDPOINT_ENABLED",
 ] as const;
 
 function copyEnv(bag: EnvBag, key: string, workerEnv?: object): void {

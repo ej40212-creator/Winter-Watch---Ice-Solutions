@@ -8,7 +8,7 @@ import { connectorPreview } from "./build/connector-preview-plugin.mjs";
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const managedLinux = readExecutionProfile() === "managed-linux";
 
-const deployVarNames = ["ACCESS_AUD", "ACCESS_ISSUER", "ACCESS_TEAM_DOMAIN", "ACCESS_JWKS_URL", "ADMIN_EMAILS", "ADMIN_GROUPS", "SCHEDULER_ENABLED", "PROVIDER_REFRESH", "PROVIDER_BUDGET", "OPERATOR_RATE_LIMIT_PER_MINUTE", "REFRESH_DUE_AFTER_MS", "ACCUWEATHER_RIGHTS_CONFIRMED", "PILOT_PUBLIC_ORIGIN"] as const;
+const deployVarNames = ["ACCESS_AUD", "ACCESS_ISSUER", "ACCESS_TEAM_DOMAIN", "ACCESS_JWKS_URL", "ADMIN_EMAILS", "ADMIN_GROUPS", "SCHEDULER_ENABLED", "PROVIDER_REFRESH", "PROVIDER_BUDGET", "OPERATOR_RATE_LIMIT_PER_MINUTE", "REFRESH_DUE_AFTER_MS", "ACCUWEATHER_RIGHTS_CONFIRMED", "PILOT_PUBLIC_ORIGIN", "SEED_ENDPOINT_ENABLED"] as const;
 const devOnlyVarNames = ["PILOT_SYNTHETIC_AUTH", "PILOT_SYNTHETIC_DATA", "PILOT_SYNTHETIC_PRIVATE_JWK", "ACCESS_JWKS_JSON"] as const;
 
 export default defineConfig(async ({ command }) => {

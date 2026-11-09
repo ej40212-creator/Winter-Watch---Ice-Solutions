@@ -15,5 +15,6 @@ declare namespace Cloudflare {
     SCHEDULER_ENABLED?: string;
     ACCUWEATHER_RIGHTS_CONFIRMED?: string;
     ACCUWEATHER_API_KEY?: string;
+    SEED_ENDPOINT_ENABLED?: string;
   }
 }

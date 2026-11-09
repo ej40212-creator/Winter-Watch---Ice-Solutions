@@ -10,7 +10,7 @@ node --experimental-strip-types scripts/d1-seed-sql.mjs --json /tmp/reviewed-sit
 
 Each object needs `sourceSiteId`, `address`, `state`, and `classification`. `provisionalKey` is optional. The script refuses more than 40 rows. The output is `{ "sha256", "statements" }` for `applySeedBatch`. It is not SQL text.
 
-The only apply path is `POST /api/admin/seed`. An admin calls it with `acknowledgement: "owner-reviewed"`, the `sha256`, and the `statements`. The handler runs `applySeedBatch` on the bound D1 database, writes the seed audit rows in that same batch, and reads back counts for sites, import batches, source rows, and reviews.
+The only apply path is `POST /api/admin/seed`. The route is off unless `SEED_ENDPOINT_ENABLED=enabled`. Turn that on for the one-time load, call the route, then unset it. An admin posts `acknowledgement: "owner-reviewed"`, the `sha256`, and the `statements`. Each statement must match an importer template. Sites must be `pending_review` and `operational = 0`, and reviews must be unresolved. The handler recomputes the file hash from those rows, runs `applySeedBatch` on the bound D1 database, sets `imported_by` to the admin email, writes the seed audit rows in that same batch, and reads back counts for sites, import batches, source rows, and reviews. A refused or failed attempt is audited.
 
 The same file hash returns those counts and writes no inventory rows. A database that already has other sites or reviews is refused. A failed batch leaves no partial seed.
 

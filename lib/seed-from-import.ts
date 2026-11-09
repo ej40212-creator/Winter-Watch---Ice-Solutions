@@ -1,17 +1,11 @@
-import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { importSiteBatch } from "./site-import.ts";
 import type { ImportRow } from "./site-identity.ts";
+import { canonicalSeedHash, seedInsertSql, SEED_TABLES, stableUlid, type SeedTable } from "./seed-statements.ts";
 import { wrapNodeSqlite } from "./sql.ts";
 import type { SqlStatement } from "./sql.ts";
-import { ulid } from "./ulid.ts";
 
 export type SeedPayload = { sha256: string; statements: SqlStatement[] };
-
-function stableUlid(material: string): string {
-  const digest = createHash("sha256").update(material).digest();
-  return ulid(0, new Uint8Array(digest.subarray(0, 10)));
-}
 
 export type ReviewedSeedSite = {
   sourceSiteId: string;
@@ -22,14 +16,10 @@ export type ReviewedSeedSite = {
   classification: string;
 };
 
-const SITE_COLUMNS = ["site_id", "source_system", "source_site_id", "source_site_id_raw", "address", "address_normalized", "state", "region", "classification", "status", "operational", "merged_into_site_id", "content_fp", "created_at", "updated_at"];
-const BATCH_COLUMNS = ["batch_id", "source_file_sha256", "source_filename", "sheet", "imported_at", "imported_by", "row_count", "contract_version", "source_system", "status", "summary_json"];
-const ROW_COLUMNS = ["batch_id", "provisional_key", "excel_row", "source_site_id", "content_fp", "site_id", "match_method", "review_status", "address", "state", "classification"];
-const REVIEW_COLUMNS = ["review_id", "batch_id", "provisional_key", "site_id", "reason", "detail", "candidate_site_ids", "dedupe_key", "resolution", "resolved_by", "resolved_at", "created_at"];
-
-function insertOrIgnore(table: string, columns: string[], row: Record<string, unknown>): SqlStatement {
+function insertOrIgnore(table: SeedTable, row: Record<string, unknown>): SqlStatement {
+  const columns = SEED_TABLES[table];
   return {
-    sql: `INSERT OR IGNORE INTO ${table}(${columns.join(",")}) VALUES (${columns.map(() => "?").join(",")})`,
+    sql: seedInsertSql(table),
     params: columns.map((column) => row[column] ?? null),
   };
 }
@@ -49,22 +39,31 @@ export async function reviewedSeedStatements(sites: ReviewedSeedSite[], now: str
     classification: site.classification,
     region: site.state.trim().toUpperCase(),
   }));
-  const sha256 = createHash("sha256").update(JSON.stringify(rows)).digest("hex");
+  const sha256 = canonicalSeedHash(rows.map((row) => ({
+    provisionalKey: row.provisionalKey,
+    excelRow: row.excelRow,
+    sourceSiteId: row.sourceSiteId,
+    sourceSiteIdRaw: row.sourceSiteIdRaw,
+    address: row.address,
+    state: row.state,
+    classification: row.classification,
+    region: row.region ?? row.state,
+  })));
   const memory = wrapNodeSqlite(new DatabaseSync(":memory:"));
   await importSiteBatch(memory, { rows, sha256, filename: "reviewed-slice.json", actor, now });
   await stabilizeSeedIds(memory, sha256);
   const statements: SqlStatement[] = [];
-  for (const row of await memory.all<Record<string, unknown>>(`SELECT ${SITE_COLUMNS.join(",")} FROM sites ORDER BY source_site_id`)) {
-    statements.push(insertOrIgnore("sites", SITE_COLUMNS, row));
+  for (const row of await memory.all<Record<string, unknown>>(`SELECT ${SEED_TABLES.sites.join(",")} FROM sites ORDER BY source_site_id`)) {
+    statements.push(insertOrIgnore("sites", row));
   }
-  for (const row of await memory.all<Record<string, unknown>>(`SELECT ${BATCH_COLUMNS.join(",")} FROM site_import_batches`)) {
-    statements.push(insertOrIgnore("site_import_batches", BATCH_COLUMNS, row));
+  for (const row of await memory.all<Record<string, unknown>>(`SELECT ${SEED_TABLES.site_import_batches.join(",")} FROM site_import_batches`)) {
+    statements.push(insertOrIgnore("site_import_batches", row));
   }
-  for (const row of await memory.all<Record<string, unknown>>(`SELECT ${ROW_COLUMNS.join(",")} FROM site_source_rows ORDER BY provisional_key`)) {
-    statements.push(insertOrIgnore("site_source_rows", ROW_COLUMNS, row));
+  for (const row of await memory.all<Record<string, unknown>>(`SELECT ${SEED_TABLES.site_source_rows.join(",")} FROM site_source_rows ORDER BY provisional_key`)) {
+    statements.push(insertOrIgnore("site_source_rows", row));
   }
-  for (const row of await memory.all<Record<string, unknown>>(`SELECT ${REVIEW_COLUMNS.join(",")} FROM site_review_queue ORDER BY reason, dedupe_key`)) {
-    statements.push(insertOrIgnore("site_review_queue", REVIEW_COLUMNS, row));
+  for (const row of await memory.all<Record<string, unknown>>(`SELECT ${SEED_TABLES.site_review_queue.join(",")} FROM site_review_queue ORDER BY reason, dedupe_key`)) {
+    statements.push(insertOrIgnore("site_review_queue", row));
   }
   return { sha256, statements };
 }

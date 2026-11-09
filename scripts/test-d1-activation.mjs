@@ -71,9 +71,10 @@ const regenerated = await reviewedSeedStatements(seedInput, '2026-11-09T02:00:00
 assert.equal(seed.sha256, regenerated.sha256);
 assert.deepEqual(seed.statements.filter((statement) => statement.sql.includes('INTO sites(')).map((statement) => statement.params[0]), regenerated.statements.filter((statement) => statement.sql.includes('INTO sites(')).map((statement) => statement.params[0]));
 assert.deepEqual(seed.statements.filter((statement) => statement.sql.includes('site_review_queue')).map((statement) => statement.params[0]), regenerated.statements.filter((statement) => statement.sql.includes('site_review_queue')).map((statement) => statement.params[0]));
-const hosted = await applyHostedSeed(seedDb, { sha256: seed.sha256, statements: seed.statements, actor: 'seed-test', now: '2026-11-09T00:00:00.000Z', acknowledgement: 'owner-reviewed' });
+const hosted = await applyHostedSeed(seedDb, { sha256: seed.sha256, statements: seed.statements, actor: 'admin@example.com', now: '2026-11-09T00:00:00.000Z', acknowledgement: 'owner-reviewed' });
 assert.equal(hosted.ok, true);
 assert.equal(hosted.skipped, false);
+assert.equal((await seedDb.get('SELECT imported_by FROM site_import_batches')).imported_by, 'admin@example.com');
 assert.equal(hosted.counts.sites, 2);
 assert.equal(hosted.counts.batches, 1);
 assert.equal(hosted.counts.sourceRows, 2);
@@ -81,6 +82,10 @@ const replay = await applyHostedSeed(seedDb, { sha256: regenerated.sha256, state
 assert.equal(replay.skipped, true);
 assert.equal(replay.counts.reviews, hosted.counts.reviews);
 assert.equal(replay.counts.sourceRows, hosted.counts.sourceRows);
+const skippedAudit = await seedDb.get("SELECT site_id FROM site_activation_audit WHERE decision = 'seed_skipped'");
+const batchId = (await seedDb.get('SELECT batch_id FROM site_import_batches')).batch_id;
+assert.notEqual(skippedAudit.site_id, batchId);
+assert.equal((await seedDb.all('SELECT site_id FROM sites')).some((row) => row.site_id === skippedAudit.site_id), true);
 const other = await reviewedSeedStatements([{ sourceSiteId: 'S3', provisionalKey: 'seed-s3', address: '3 Fictional Campus, Example City, TX 73301', state: 'TX', classification: 'Event' }], '2026-11-09T03:00:00.000Z', 'seed-test');
 const refused = await applyHostedSeed(seedDb, { sha256: other.sha256, statements: other.statements, actor: 'seed-test', now: '2026-11-09T03:00:00.000Z', acknowledgement: 'owner-reviewed' });
 assert.equal(refused.ok, false);

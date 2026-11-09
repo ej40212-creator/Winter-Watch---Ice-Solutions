@@ -18,6 +18,7 @@ const tests = [
   "scripts/test-forecast-fetch.mjs",
   "scripts/test-forecast.mjs",
   "scripts/test-rate-limit.mjs",
+  "scripts/test-seed-guard.mjs",
   "scripts/test-xlsx-reader.mjs",
   "scripts/test-request-guards.mjs",
 ];

@@ -30,6 +30,7 @@ Suggested worker vars, all unset until the decisions above exist:
 - `PROVIDER_REFRESH` left unset. Live Census/NWS/NOAA calls also require `PROVIDER_BUDGET` set to a positive integer. That value is intentionally unset here, so reads stay cache-only.
 - `REFRESH_DUE_AFTER_MS` left unset. Successful sites are held and reported, not silently dropped and not given an invented cadence.
 - `OPERATOR_RATE_LIMIT_PER_MINUTE` left unset. The code then uses 150 per minute, because one queue load can call `/api/current` for each site in a 40-site batch. `accessIdentity` calls `consumeDurableRate` on the D1 `identity_rate` table when `DB` is bound. A missing table or other D1 error returns 503. When D1 is not bound, the same ceiling is the per-isolate map, which drops windows older than two minutes. Live provider calls never use that map; each fetch attempt requires the D1 `provider_budget` counter.
+- `SEED_ENDPOINT_ENABLED` left unset. The seed route stays disabled. Set it to `enabled` only for the one-time reviewed load, then unset it.
 - `ACCUWEATHER_RIGHTS_CONFIRMED` left unset
 - Do not set `PILOT_SYNTHETIC_AUTH`, `PILOT_SYNTHETIC_DATA`, or `PILOT_SYNTHETIC_PRIVATE_JWK` on a deployment. Production builds omit them, and synthetic sign-in is compiled out unless `import.meta.env.DEV` is true and the host is loopback.
 
