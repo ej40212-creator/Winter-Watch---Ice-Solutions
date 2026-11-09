@@ -1,0 +1,19 @@
+Passed: dry cold, snow, ice, frost, refreeze, priority, horizon boundaries, expired/test alerts, incomplete data.
+Passed: 24/48/72/168-hour priorities, late warning, exact week cutoff, and window-specific partial coverage.
+Passed: local daily boundaries, DST, partial dates, cutoff, unavailable days, missing values, cold/snow/ice separation and AccuWeather normalization.
+Passed: checked versus complete, missing alerts, rolling coverage, overdue data, address failures and bounded retry backoff.
+Observation conversion, missing fields, stale and future timestamps passed.
+Analytics tests passed: freshness, coverage, state gaps, shared grids, retries, time windows, empty data.
+Passed: forged and missing identity, wrong audience and issuer, expiry, unsigned alg, role denial, and fail-closed config.
+Passed: repeated and shuffled imports preserve ids, duplicates stay separate, exclusions and flags remain, and absent rows are not deleted.
+Passed full inventory accounting: 3095 input rows, 3094 unactivated sites, 23 duplicate-id reviews, 108 address flags, 1 DC exclusion. Shuffled lineage keys did not change site ids.
+(node:3694) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Passed: shared grid forecast does not carry another site’s point alerts.
+Passed: missing temperature stays unavailable and a real 0°F stays zero.
+Passed: 24/48/72/168-hour windows keep their own hazards and cutoffs.
+(node:3723) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Passed: scheduler lease, batch cap, backoff, and expired-lease recovery. These cycles are simulated and did not call a provider.
+Passed: provider failure, stale issue time, and partial forecast states do not invent a clear reading.
+Passed 12 test files.

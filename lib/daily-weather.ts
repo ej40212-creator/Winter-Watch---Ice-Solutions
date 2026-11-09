@@ -11,8 +11,9 @@ async function accuJSON(path:string,token:string){
 }
 export async function dailyForecast(key:string,provider:'nws'|'accuweather'):Promise<DailyResult>{
  if(!sites.some(s=>s.key===key&&s.state!=='DC'))return {provider,status:'unavailable',error:'Unknown site.'};
- const token=(env as any).ACCUWEATHER_API_KEY;
- if(provider==='accuweather'&&!token)return {provider,status:'not_connected',error:'AccuWeather daily data is not connected. Use the external forecast link to cross-check this location.'};
+ const rightsConfirmed=(env as any).ACCUWEATHER_RIGHTS_CONFIRMED==='authorized';
+ const token=rightsConfirmed?(env as any).ACCUWEATHER_API_KEY:undefined;
+ if(provider==='accuweather'&&!token)return {provider,status:'not_connected',error:'AccuWeather is disabled until an authorized key and display rights are both configured. The external city link is a reference, not a live AccuWeather feed.'};
  const cacheKey=`daily-v1:${provider}:${key}`;
  const known=await cached(cacheKey);if(known)return known;
  try{

@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import { summarize } from '../lib/risk.ts';
+import { fahrenheit } from '../lib/observation.ts';
+import { formatForecastLow } from '../lib/display-temp.ts';
+import { buildFailureRecord } from '../lib/cache-policy.ts';
+
+const now = Date.parse('2026-01-01T00:00:00Z');
+const hour = (temperature) => ({ startTime: new Date(now).toISOString(), endTime: new Date(now + 3600000).toISOString(), temperature, temperatureUnit: 'F', dewpoint: { value: -20 }, relativeHumidity: { value: 40 }, probabilityOfPrecipitation: { value: 0 }, shortForecast: 'Clear', windSpeed: '10 mph', isDaytime: true });
+const missing = summarize([hour(null)], [], now, 24);
+const zero = summarize([hour(0)], [], now, 24);
+assert.equal(missing.minTemp, null);
+assert.equal(zero.minTemp, 0);
+assert.equal(fahrenheit(null), null);
+assert.equal(fahrenheit({ value: null }), null);
+assert.equal(fahrenheit({ value: 0, unitCode: 'wmoUnit:degF' }), 0);
+assert.deepEqual(formatForecastLow(null, true), { text: 'Unavailable', unavailable: true });
+assert.deepEqual(formatForecastLow(0, true), { text: '0°F', unavailable: false });
+assert.equal(formatForecastLow(0, false).text, 'Unavailable');
+const failure = buildFailureRecord({ siteKey: 'site-a', error: 'Weather provider temporarily unavailable (503).', now });
+assert.equal(failure.status, 'error');
+assert.equal(failure.minTemp, null);
+assert.equal(failure.priority, 0);
+assert.deepEqual(failure.alerts, []);
+assert.notEqual(failure.minTemp, 0);
+console.log('Passed: missing temperature stays unavailable and a real 0°F stays zero.');

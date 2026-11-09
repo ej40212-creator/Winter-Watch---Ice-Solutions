@@ -14,9 +14,13 @@ const { d1, r2 } = hostingConfig;
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const managedLinux = readExecutionProfile() === "managed-linux";
 
+const pilotVarNames = ["ACCESS_AUD", "ACCESS_ISSUER", "ACCESS_TEAM_DOMAIN", "ACCESS_JWKS_JSON", "ACCESS_JWKS_URL", "ADMIN_EMAILS", "ADMIN_GROUPS", "PILOT_SYNTHETIC_AUTH", "PILOT_SYNTHETIC_PRIVATE_JWK", "PILOT_SYNTHETIC_DATA", "SCHEDULER_ENABLED", "PROVIDER_REFRESH", "ACCUWEATHER_RIGHTS_CONFIRMED", "PILOT_PUBLIC_ORIGIN"] as const;
+const pilotVars = Object.fromEntries(pilotVarNames.flatMap((name) => process.env[name] ? [[name, process.env[name]]] : []));
+
 const localBindingConfig = {
   main: "./build/sites-worker.ts",
   compatibility_flags: ["nodejs_compat"],
+  vars: pilotVars,
   d1_databases: d1
     ? [
         {
@@ -62,7 +66,7 @@ export default defineConfig(async ({ command }) => {
     },
     plugins: [
       vinext(),
-      sites({ mockAuth: !managedLinux }),
+      sites({ mockAuth: false }),
       connectorPreview(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
