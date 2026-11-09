@@ -1,4 +1,5 @@
-export const SAFETY_RATE_LIMIT_PER_MINUTE = 30;
+/** A queue load can request current conditions for every site in a 40-site batch. */
+export const SAFETY_RATE_LIMIT_PER_MINUTE = 150;
 
 export type ProviderDecision = {
   allowLive: boolean;

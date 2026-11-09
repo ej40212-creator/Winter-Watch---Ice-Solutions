@@ -1,21 +1,17 @@
-# Loading a reviewed slice into local D1
+# Loading a reviewed slice
 
-A reviewed load is 1 to 40 sites. The statements come from the workbook importer, so the content fingerprint, source system, lineage rows, and address or duplicate review flags match a later import of the same rows. The sites stay `operational = 0`. Running the same statements again is a no-op: inserts use `INSERT OR IGNORE`, and `(source_system, content_fp)` is unique for sites that are not excluded.
+Apply a reviewed seed once, to an empty D1 database. The payload is 1 to 40 sites. It is produced by the workbook importer, so the fingerprint, source system, lineage, and review flags match a later import of the same rows. Site, batch, and review ids are derived from the file hash and the content fingerprint. Regenerating the payload does not mint a second set of ids. The sites stay `operational = 0`.
 
-Generate the statements from a JSON file that is not committed:
-
-```bash
-node --experimental-strip-types scripts/d1-seed-sql.mjs --json /tmp/reviewed-sites.json > /tmp/reviewed-seed.sql
-```
-
-Each object needs `sourceSiteId`, `address`, `state`, and `classification`. `provisionalKey` is optional. The script refuses more than 40 rows.
-
-The tested all-or-nothing apply path is `applySeedBatch`, which uses D1 `batch()` (or one sqlite transaction in the Node tool). A failed statement leaves no partial seed. `scripts/d1-batch-evidence.ts` is a local wrangler entrypoint for that check. It is not the application worker. Post `{ "statements": [...] }` to it. `wrangler d1 execute --file` is not that path: local D1 rejects `BEGIN`/`COMMIT`, and a multi-statement file is not one transaction.
-
-Apply the pilot schema, which is idempotent, with:
+Generate the payload from a JSON file that is not committed. This command does not write to a database:
 
 ```bash
-npx wrangler d1 execute winter-watch-pilot --local --config wrangler.jsonc --file db/0001_pilot.sql
+node --experimental-strip-types scripts/d1-seed-sql.mjs --json /tmp/reviewed-sites.json > /tmp/reviewed-seed.json
 ```
 
-Do not point this at a hosted database from this repository. Hosted D1 is a later gate.
+Each object needs `sourceSiteId`, `address`, `state`, and `classification`. `provisionalKey` is optional. The script refuses more than 40 rows. The output is `{ "sha256", "statements" }` for `applySeedBatch`. It is not SQL text.
+
+The only apply path is `POST /api/admin/seed`. An admin calls it with `acknowledgement: "owner-reviewed"`, the `sha256`, and the `statements`. The handler runs `applySeedBatch` on the bound D1 database, writes the seed audit rows in that same batch, and reads back counts for sites, import batches, source rows, and reviews.
+
+The same file hash returns those counts and writes no inventory rows. A database that already has other sites or reviews is refused. A failed batch leaves no partial seed.
+
+The pilot schema has to be present before the first call. Creating or pointing this repository at a hosted database is a later gate. When that database is bound as `DB`, this endpoint is the hosted path.

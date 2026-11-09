@@ -1,5 +1,4 @@
 import { readFileSync } from "node:fs";
-import { reviewedSeedScript } from "../lib/d1-seed.ts";
 import { reviewedSeedStatements } from "../lib/seed-from-import.ts";
 
 const index = process.argv.indexOf("--json");
@@ -10,4 +9,5 @@ if (!path) {
 }
 const sites = JSON.parse(readFileSync(path, "utf8"));
 const now = new Date().toISOString();
-process.stdout.write(reviewedSeedScript(await reviewedSeedStatements(sites, now, "seed-script")));
+const payload = await reviewedSeedStatements(sites, now, "seed-script");
+process.stdout.write(`${JSON.stringify(payload)}\n`);

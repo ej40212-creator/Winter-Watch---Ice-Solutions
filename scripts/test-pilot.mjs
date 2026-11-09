@@ -17,6 +17,7 @@ const tests = [
   "scripts/test-d1-activation.mjs",
   "scripts/test-forecast-fetch.mjs",
   "scripts/test-forecast.mjs",
+  "scripts/test-rate-limit.mjs",
   "scripts/test-xlsx-reader.mjs",
   "scripts/test-request-guards.mjs",
 ];

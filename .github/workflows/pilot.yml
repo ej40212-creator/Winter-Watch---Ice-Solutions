@@ -1,5 +1,7 @@
 name: pilot
 # Typecheck, unit tests, secret scan, production build, and the bundle check.
+permissions:
+  contents: read
 on:
   pull_request:
   push:

@@ -20,14 +20,24 @@ export async function accessIdentity(request: Request, env: EnvBag = readRuntime
   if (!decision.ok) return Response.json({ error: decision.error, message: decision.message }, { status: decision.status, headers: PRIVATE });
   const limit = rateLimitPerMinute(env);
   const database = (workerEnv as { DB?: D1Database }).DB;
-  const identity = decision.identity.sub || decision.identity.email;
-  const allowed = database
-    ? await consumeDurableRate(wrapD1(database), identity, now, limit.limit)
-    : consumeIdentityRate(identity, now, limit.limit).allowed;
-  if (!allowed) {
-    return Response.json({ error: "rate_limited", message: "This identity exceeded the per-minute request limit.", policy: database ? "durable" : limit.policy }, { status: 429, headers: { ...PRIVATE, "x-rate-limit-policy": database ? "durable" : limit.policy } });
-  }
+  const limited = await enforceIdentityLimit(database, decision.identity.sub || decision.identity.email, now, limit.limit, database ? "durable" : limit.policy);
+  if (limited) return limited;
   return { identity: decision.identity, env };
+}
+
+/** 429 when the counter is spent. 503 when the D1 counter cannot be written, including a missing table. */
+export async function enforceIdentityLimit(database: D1Database | undefined, identity: string, now: number, limit: number, policy = "safety-ceiling"): Promise<Response | null> {
+  try {
+    const allowed = database
+      ? await consumeDurableRate(wrapD1(database), identity, now, limit)
+      : consumeIdentityRate(identity, now, limit).allowed;
+    if (!allowed) {
+      return Response.json({ error: "rate_limited", message: "This identity exceeded the per-minute request limit.", policy }, { status: 429, headers: { ...PRIVATE, "x-rate-limit-policy": policy } });
+    }
+    return null;
+  } catch {
+    return Response.json({ error: "configuration_required", message: "The rate-limit table could not be updated. The request was not counted." }, { status: 503, headers: PRIVATE });
+  }
 }
 
 export async function requireAdmin(request: Request, env?: EnvBag): Promise<{ identity: AccessIdentity; env: EnvBag } | Response> {
