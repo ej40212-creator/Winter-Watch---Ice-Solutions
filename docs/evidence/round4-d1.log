@@ -1,0 +1,7 @@
+commit c6c66b9857048fba7b004d892cf771ce32441380
+schema wrangler d1 execute --file db/0001_pilot.sql --local exit 0
+applySeedBatch via scripts/d1-batch-evidence.ts on 127.0.0.1:8788
+first apply {"ok":true,"sites":2,"activated":0}
+rerun {"ok":true,"sites":2,"activated":0}
+failed batch {"committed":false,"leftover":0,"error":"D1_ERROR: no such table: does_not_exist: SQLITE_ERROR"}
+sites stayed SYN-R4-1 and SYN-R4-2, operational 0, status pending_review
