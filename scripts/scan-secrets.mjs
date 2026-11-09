@@ -8,7 +8,7 @@ const badNames = tracked.filter((file) => blockedName.test(file) || provisional.
 const patterns = [/-----BEGIN [A-Z ]*PRIVATE KEY-----/, /PILOT_SYNTHETIC_PRIVATE_JWK"\s*:\s*"\{/, /AKIA[0-9A-Z]{16}/, /\b\d{1,6}\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}\s+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct)\b/];
 const hits = [];
 for (const file of tracked) {
-  if (file.endsWith(".png") || file.endsWith(".log") || file.endsWith(".txt") || file.startsWith("fixtures/") || file.startsWith("scripts/test-")) continue;
+  if (file.endsWith(".png") || file.startsWith("fixtures/") || file.startsWith("scripts/test-")) continue;
   let text = "";
   try { text = readFileSync(file, "utf8"); } catch { continue; }
   for (const pattern of patterns) if (pattern.test(text)) hits.push(`${file} matches ${pattern}`);
