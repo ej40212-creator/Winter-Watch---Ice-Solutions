@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {fahrenheit,mph,observation,recent} from '../lib/observation.ts';
+assert.equal(fahrenheit({value:0,unitCode:'wmoUnit:degC'}),32);
+assert.equal(fahrenheit({value:null,unitCode:'wmoUnit:degC'}),null);
+assert.equal(fahrenheit({value:20,unitCode:'unknown'}),null);
+assert.equal(mph({value:16.09344,unitCode:'wmoUnit:km_h-1'}),10);
+assert.equal(mph({value:null}),null);
+assert.equal(observation({}).feelsLike,null);
+const now=Date.parse('2026-11-05T12:00:00Z');
+assert(recent('2026-11-05T11:00:00Z',now));
+assert(!recent('2026-11-05T10:00:00Z',now));
+assert(!recent('2026-11-05T13:00:00Z',now));
+assert(!recent('invalid',now));
+console.log('Observation conversion, missing fields, stale and future timestamps passed.');

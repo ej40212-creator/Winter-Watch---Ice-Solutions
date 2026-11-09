@@ -1,0 +1,196 @@
+runtime_commit c6c66b9857048fba7b004d892cf771ce32441380
+server http://127.0.0.1:5173 bind 127.0.0.1
+schema applied and two synthetic sites seeded unactivated; PROVIDER_BUDGET=1; PROVIDER_REFRESH=authorized; synthetic flags unset
+started 2026-11-09T18:47:52Z
+
+=== 1. no token ===
++ 2026-11-09T18:47:52Z curl -sS -D - http://127.0.0.1:5173/api/sites
+HTTP/1.1 401 Unauthorized
+Vary: Origin
+cache-control: private, no-store
+content-length: 81
+content-type: application/json
+Date: Mon, 09 Nov 2026 18:47:53 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"unauthorized","message":"A valid Cloudflare Access token is required."}
+curl_exit:0
+
+=== 2. cookie activate without Origin ===
++ 2026-11-09T18:47:53Z curl -sS -D - -X POST -H 'content-type: application/json' -H 'Cf-Access-Jwt-Assertion: [redacted admin]' -H 'Cookie: CF_Authorization=[redacted]' --data '{"siteId":"01M70T4759E6536N7PFHZATJRV","decision":"activate","acknowledgement":"owner-reviewed"}' http://127.0.0.1:5173/api/admin/sites
+HTTP/1.1 403 Forbidden
+vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:47:53 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"forbidden","message":"The request origin is not accepted."}
+curl_exit:0
+
+=== 3. cookie activate with Origin ===
++ 2026-11-09T18:47:53Z curl -sS -D - -X POST -H 'content-type: application/json' -H 'Origin: http://127.0.0.1:5173' -H 'Cf-Access-Jwt-Assertion: [redacted admin]' -H 'Cookie: CF_Authorization=[redacted]' --data '{"siteId":"01M70T4759E6536N7PFHZATJRV","decision":"activate","acknowledgement":"owner-reviewed"}' http://127.0.0.1:5173/api/admin/sites
+HTTP/1.1 200 OK
+Access-Control-Allow-Origin: http://127.0.0.1:5173
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:47:53 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"siteId":"01M70T4759E6536N7PFHZATJRV","operational":1,"actor":"pilot-admin@example.com","execution":"database"}
+curl_exit:0
+
+=== 4. operator sites list ===
++ 2026-11-09T18:47:53Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' http://127.0.0.1:5173/api/sites
+HTTP/1.1 200 OK
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:47:53 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"mode":"activated","execution":"database","sites":[{"key":"01M70T4759E6536N7PFHZATJRV","id":"SYN-R4-1","region":"CO","address":"1 Fictional Campus, Example City, CO 80014","state":"CO","classification":"Event","demo":false}]}
+curl_exit:0
+
+=== 5. cached weather for the activated site ===
++ 2026-11-09T18:47:53Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' 'http://127.0.0.1:5173/api/weather?key=01M70T4759E6536N7PFHZATJRV'
+HTTP/1.1 200 OK
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:47:53 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"key":"01M70T4759E6536N7PFHZATJRV","status":"ok","execution":"cache","minTemp":12,"alerts":[],"hours":[],"hazards":[],"complete":false,"priority":0,"sourceAddress":"1 Fictional Campus, Example City, CO 80014","alertsChecked":true}
+curl_exit:0
+
+=== 6. daily read after the one-call budget is spent ===
++ 2026-11-09T18:47:53Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' 'http://127.0.0.1:5173/api/daily?key=01M70T4759E6536N7PFHZATJRV&provider=nws'
+HTTP/1.1 200 OK
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:47:53 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"provider":"nws","status":"unavailable","updated":"2026-11-09T18:47:53.564Z","error":"Address could not be matched; location needs review."}
+curl_exit:0
+
+=== 7. cookie deactivate with Origin ===
++ 2026-11-09T18:47:53Z curl -sS -D - -X POST -H 'content-type: application/json' -H 'Origin: http://127.0.0.1:5173' -H 'Cf-Access-Jwt-Assertion: [redacted admin]' -H 'Cookie: CF_Authorization=[redacted]' --data '{"siteId":"01M70T4759E6536N7PFHZATJRV","decision":"deactivate"}' http://127.0.0.1:5173/api/admin/sites
+HTTP/1.1 200 OK
+Access-Control-Allow-Origin: http://127.0.0.1:5173
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:47:53 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"siteId":"01M70T4759E6536N7PFHZATJRV","operational":0,"actor":"pilot-admin@example.com","execution":"database"}
+curl_exit:0
+
+=== 8. weather after deactivate ===
++ 2026-11-09T18:47:53Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' 'http://127.0.0.1:5173/api/weather?key=01M70T4759E6536N7PFHZATJRV'
+HTTP/1.1 404 Not Found
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:47:53 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"That site is not activated.","execution":"not_run"}
+curl_exit:0
+
+=== 9. daily after deactivate ===
++ 2026-11-09T18:47:53Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' 'http://127.0.0.1:5173/api/daily?key=01M70T4759E6536N7PFHZATJRV&provider=nws'
+HTTP/1.1 404 Not Found
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:47:53 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"That site is not activated.","execution":"not_run"}
+curl_exit:0
+
+finished 2026-11-09T18:47:53Z
+
+=== 10. reactivate with Origin so the next read reaches the provider ===
++ 2026-11-09T18:48:18Z curl -sS -D - -X POST -H 'Origin: http://127.0.0.1:5173' -H 'content-type: application/json' -H 'Cf-Access-Jwt-Assertion: [redacted admin]' -H 'Cookie: CF_Authorization=[redacted]' --data '{"siteId":"01M70T4759E6536N7PFHZATJRV","decision":"activate","acknowledgement":"owner-reviewed"}' http://127.0.0.1:5173/api/admin/sites
+HTTP/1.1 200 OK
+Access-Control-Allow-Origin: http://127.0.0.1:5173
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:48:18 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"siteId":"01M70T4759E6536N7PFHZATJRV","operational":1,"actor":"pilot-admin@example.com","execution":"database"}
+curl_exit:0
+
+=== 11. daily read with the hourly budget already spent ===
++ 2026-11-09T18:48:18Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' 'http://127.0.0.1:5173/api/daily?key=01M70T4759E6536N7PFHZATJRV&provider=nws'
+HTTP/1.1 200 OK
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:48:18 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"provider":"nws","status":"unavailable","updated":"2026-11-09T18:48:18.844Z","error":"Provider budget for this period is exhausted. No further provider call was made."}
+curl_exit:0
+
+=== 12. deactivate again with Origin ===
++ 2026-11-09T18:48:18Z curl -sS -D - -X POST -H 'Origin: http://127.0.0.1:5173' -H 'content-type: application/json' -H 'Cf-Access-Jwt-Assertion: [redacted admin]' -H 'Cookie: CF_Authorization=[redacted]' --data '{"siteId":"01M70T4759E6536N7PFHZATJRV","decision":"deactivate"}' http://127.0.0.1:5173/api/admin/sites
+HTTP/1.1 200 OK
+Access-Control-Allow-Origin: http://127.0.0.1:5173
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:48:18 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"siteId":"01M70T4759E6536N7PFHZATJRV","operational":0,"actor":"pilot-admin@example.com","execution":"database"}
+curl_exit:0
+
+=== 13. weather refused after the second deactivate ===
++ 2026-11-09T18:48:18Z curl -sS -D - -H 'Cf-Access-Jwt-Assertion: [redacted operator]' 'http://127.0.0.1:5173/api/weather?key=01M70T4759E6536N7PFHZATJRV'
+HTTP/1.1 404 Not Found
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 18:48:18 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"error":"That site is not activated.","execution":"not_run"}
+curl_exit:0
+
+
+=== notes ===
+Section 5 is a cache hit for an activated seeded site. Section 6 geocoded once and spent the only budget unit, then failed the address match. Section 11 is the next provider read after that unit was spent. Sections 8, 9, and 13 are refusals after deactivate.

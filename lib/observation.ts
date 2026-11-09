@@ -1,0 +1,5 @@
+type Quantity={value:number|null;unitCode?:string}|null|undefined;
+export function fahrenheit(q:Quantity){if(typeof q?.value!=='number'||!Number.isFinite(q.value))return null;return q.unitCode==='wmoUnit:degC'?q.value*9/5+32:q.unitCode==='wmoUnit:degF'?q.value:null;}
+export function mph(q:Quantity){if(typeof q?.value!=='number'||!Number.isFinite(q.value))return null;return q.unitCode==='wmoUnit:km_h-1'?q.value/1.609344:q.unitCode==='wmoUnit:m_s-1'?q.value*2.236936:q.unitCode==='wmoUnit:mi_h-1'?q.value:q.unitCode==='wmoUnit:kn'?q.value*1.150779:null;}
+export function observation(p:any){return {observedAt:p.timestamp,description:p.textDescription||'Conditions not reported',temperature:fahrenheit(p.temperature),feelsLike:fahrenheit(p.windChill)??fahrenheit(p.heatIndex),dewpoint:fahrenheit(p.dewpoint),humidity:typeof p.relativeHumidity?.value==='number'?p.relativeHumidity.value:null,wind:mph(p.windSpeed),gust:mph(p.windGust)};}
+export function recent(timestamp:string,now=Date.now()){const t=Date.parse(timestamp);return Number.isFinite(t)&&now-t<=90*60000&&t<=now+5*60000;}

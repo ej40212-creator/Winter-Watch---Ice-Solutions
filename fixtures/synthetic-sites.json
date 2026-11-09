@@ -1,0 +1,56 @@
+[
+  {
+    "key": "syn-co-01",
+    "id": "SYN-1001",
+    "region": "CO",
+    "address": "100 Synthetic Pilot Lane, Fictional City, CO 80014",
+    "state": "CO",
+    "classification": "Event",
+    "demo": true
+  },
+  {
+    "key": "syn-mn-01",
+    "id": "SYN-1002",
+    "region": "MN",
+    "address": "200 Synthetic Pilot Lane, Fictional City, MN 55101",
+    "state": "MN",
+    "classification": "Seasonal",
+    "demo": true
+  },
+  {
+    "key": "syn-tx-01",
+    "id": "SYN-1003",
+    "region": "TX",
+    "address": "300 Synthetic Pilot Lane, Fictional City, TX 73301",
+    "state": "TX",
+    "classification": "Event",
+    "demo": true
+  },
+  {
+    "key": "syn-oh-01",
+    "id": "SYN-1004",
+    "region": "OH",
+    "address": "400 Synthetic Pilot Lane, Fictional City, OH 44101",
+    "state": "OH",
+    "classification": "Seasonal",
+    "demo": true
+  },
+  {
+    "key": "syn-wa-01",
+    "id": "SYN-1005",
+    "region": "WA",
+    "address": "500 Synthetic Pilot Lane, Fictional City, WA 98101",
+    "state": "WA",
+    "classification": "Event",
+    "demo": true
+  },
+  {
+    "key": "syn-ga-01",
+    "id": "SYN-1006",
+    "region": "GA",
+    "address": "600 Synthetic Pilot Lane, Fictional City, GA 30301",
+    "state": "GA",
+    "classification": "Seasonal",
+    "demo": true
+  }
+]

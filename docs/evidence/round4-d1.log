@@ -1,0 +1,14 @@
+commit c6c66b9857048fba7b004d892cf771ce32441380
+schema wrangler d1 execute --file db/0001_pilot.sql --local exit 0
+applySeedBatch via scripts/d1-batch-evidence.ts on 127.0.0.1:8788
+first apply {"ok":true,"sites":2,"activated":0}
+rerun {"ok":true,"sites":2,"activated":0}
+sites stayed SYN-R4-1 and SYN-R4-2, operational 0, status pending_review
+
+The first failed-batch line counted source_site_id SHOULD-NOT-LAND. That id was not in the batch, so leftover 0 did not show a rollback.
+
+Corrected on local D1 at /tmp/ww-d1-r5, 2026-11-09, with the worker that inserts PROBE-R5 and then a missing table:
+apply {"ok":true,"sites":2,"activated":0}
+failed batch {"committed":false,"leftover":0,"error":"D1_ERROR: no such table: does_not_exist: SQLITE_ERROR"}
+follow-up counts: sites 2, probe 0
+PROBE-R5 was inside the failed batch. leftover 0 and probe 0 mean that insert was rolled back.

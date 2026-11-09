@@ -1,0 +1,58 @@
+commit ae3674c35dca7e335967332190bda0b6e268ae5f
+started 2026-11-09T18:24:28Z
+$ node scripts/run-framework.mjs build
+
+  vinext build  (Vite 8.0.13)
+
+[1/5] analyze client references...
+[2Ktransforming...✓ 274 modules transformed.
+rendering chunks...
+✓ built in 1.18s
+[2/5] analyze server references...
+[2Ktransforming...✓ 132 modules transformed.
+rendering chunks...
+✓ built in 256ms
+[3/5] build rsc environment...
+[2Ktransforming...✓ 270 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 769ms
+[4/5] build client environment...
+[2Ktransforming...✓ 1918 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 1.33s
+[5/5] build ssr environment...
+[2Ktransforming...✓ 138 modules transformed.
+rendering chunks...
+computing gzip size...
+✓ built in 452ms
+[0m
+  Route (app)
+  ┌ ? /                   
+  ├ λ /api/admin/review   
+  ├ λ /api/admin/sites    
+  ├ λ /api/coverage       
+  ├ λ /api/current        
+  ├ λ /api/daily          
+  ├ λ /api/performance    
+  ├ λ /api/pilot-session  
+  ├ λ /api/radar          
+  ├ λ /api/refresh        
+  ├ λ /api/sites          
+  ├ λ /api/weather        
+  ├ λ /api/winter-guidance
+  └ λ /mcp                
+
+  λ API  ? Unknown
+
+  ? Some routes could not be classified. vinext currently uses static analysis
+    and cannot detect dynamic API usage (headers(), cookies(), etc.) at build time.
+    Automatic classification will be improved in a future release.
+
+  Build complete. Run `vinext start` to start the production server.
+
+build_exit:0
+Build config and JS bundle do not contain synthetic auth, a private JWK, or an enabled workers.dev publish.
+check_build_exit:0
+finished 2026-11-09T18:24:35Z

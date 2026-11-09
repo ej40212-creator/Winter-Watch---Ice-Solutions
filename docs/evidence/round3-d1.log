@@ -1,0 +1,235 @@
+=== schema ===
+
+ ⛅️ wrangler 4.92.0 (update available 4.159.0)
+──────────────────────────────────────────────
+Resource location: local 
+
+Use --remote if you want to access the remote instance.
+
+🌀 Executing on local database winter-watch-pilot (00000000-0000-4000-8000-000000000000) from ../tmp/ww-d1-r3/v3/d1:
+🌀 To execute on your remote database, add a --remote flag to your wrangler command.
+🚣 1 command executed successfully.
+[
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  }
+]
+exit:0
+
+ ⛅️ wrangler 4.92.0 (update available 4.159.0)
+──────────────────────────────────────────────
+Resource location: local 
+
+Use --remote if you want to access the remote instance.
+
+🌀 Executing on local database winter-watch-pilot (00000000-0000-4000-8000-000000000000) from ../tmp/ww-d1-r3/v3/d1:
+🌀 To execute on your remote database, add a --remote flag to your wrangler command.
+🚣 17 commands executed successfully.
+[
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  },
+  {
+    "results": [],
+    "success": true,
+    "meta": {
+      "duration": 0
+    }
+  }
+]
+exit:0
+=== seed ===
+
+ ⛅️ wrangler 4.92.0 (update available 4.159.0)
+──────────────────────────────────────────────
+Resource location: local 
+
+Use --remote if you want to access the remote instance.
+
+🌀 Executing on local database winter-watch-pilot (00000000-0000-4000-8000-000000000000) from ../tmp/ww-d1-r3/v3/d1:
+🌀 To execute on your remote database, add a --remote flag to your wrangler command.
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mNo SQL statements detected.[0m
+
+
+🪵  Logs were written to "/home/ubuntu/.config/.wrangler/logs/wrangler-2026-11-09_18-03-55_026.log"
+exit:1
+=== count unactivated ===
+
+ ⛅️ wrangler 4.92.0 (update available 4.159.0)
+──────────────────────────────────────────────
+Resource location: local 
+
+Use --remote if you want to access the remote instance.
+
+🌀 Executing on local database winter-watch-pilot (00000000-0000-4000-8000-000000000000) from ../tmp/ww-d1-r3/v3/d1:
+🌀 To execute on your remote database, add a --remote flag to your wrangler command.
+🚣 1 command executed successfully.
+[
+  {
+    "results": [
+      {
+        "sites": 0,
+        "activated": null
+      }
+    ],
+    "success": true,
+    "meta": {
+      "duration": 1
+    }
+  }
+]
+exit:0
+=== failing transaction ===
+
+ ⛅️ wrangler 4.92.0 (update available 4.159.0)
+──────────────────────────────────────────────
+Resource location: local 
+
+Use --remote if you want to access the remote instance.
+
+🌀 Executing on local database winter-watch-pilot (00000000-0000-4000-8000-000000000000) from ../tmp/ww-d1-r3/v3/d1:
+🌀 To execute on your remote database, add a --remote flag to your wrangler command.
+
+[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mTo execute a transaction, please use the state.storage.transaction() or state.storage.transactionSync() APIs instead of the SQL BEGIN TRANSACTION or SAVEPOINT statements. The JavaScript API is safer because it will automatically roll back on exceptions, and because it interacts correctly with Durable Objects' automatic atomic write coalescing.[0m
+
+
+🪵  Logs were written to "/home/ubuntu/.config/.wrangler/logs/wrangler-2026-11-09_18-03-56_997.log"
+exit:1
+
+ ⛅️ wrangler 4.92.0 (update available 4.159.0)
+──────────────────────────────────────────────
+Resource location: local 
+
+Use --remote if you want to access the remote instance.
+
+🌀 Executing on local database winter-watch-pilot (00000000-0000-4000-8000-000000000000) from ../tmp/ww-d1-r3/v3/d1:
+🌀 To execute on your remote database, add a --remote flag to your wrangler command.
+🚣 1 command executed successfully.
+[
+  {
+    "results": [
+      {
+        "sites": 0
+      }
+    ],
+    "success": true,
+    "meta": {
+      "duration": 1
+    }
+  }
+]
+exit:0

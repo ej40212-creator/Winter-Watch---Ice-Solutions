@@ -1,0 +1,19 @@
+=== BASELINE 2026-11-09T17:08:44Z node v22.23.4 ===
+--- tsc --noEmit ---
+tsc_exit:0
+--- node --experimental-strip-types scripts/test-risk.mjs ---
+Passed: dry cold, snow, ice, frost, refreeze, priority, horizon boundaries, expired/test alerts, incomplete data.
+Passed: 24/48/72/168-hour priorities, late warning, exact week cutoff, and window-specific partial coverage.
+test-risk_exit:0
+--- node --experimental-strip-types scripts/test-daily.mjs ---
+Passed: local daily boundaries, DST, partial dates, cutoff, unavailable days, missing values, cold/snow/ice separation and AccuWeather normalization.
+test-daily_exit:0
+--- node --experimental-strip-types scripts/test-coverage.mjs ---
+Passed: checked versus complete, missing alerts, rolling coverage, overdue data, address failures and bounded retry backoff.
+test-coverage_exit:0
+--- node --experimental-strip-types scripts/test-observation.mjs ---
+Observation conversion, missing fields, stale and future timestamps passed.
+test-observation_exit:0
+--- node --experimental-strip-types scripts/test-analytics.mjs ---
+Analytics tests passed: freshness, coverage, state gaps, shared grids, retries, time windows, empty data.
+test-analytics_exit:0

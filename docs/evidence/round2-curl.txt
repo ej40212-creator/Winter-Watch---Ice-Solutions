@@ -1,0 +1,169 @@
+commit e9dff50730380d550e5bfe6cb26ff72f02096c77
+started 2026-11-09T17:45:57Z
+
+=== 1. no token, JSON ===
+HTTP/1.1 401 Unauthorized
+Vary: Origin
+cache-control: private, no-store
+content-length: 81
+content-type: application/json
+Date: Mon, 09 Nov 2026 17:45:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== 2. forged oai header only ===
+HTTP/1.1 401 Unauthorized
+Vary: Origin
+cache-control: private, no-store
+content-length: 81
+content-type: application/json
+Date: Mon, 09 Nov 2026 17:45:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== 3. valid operator plus forged oai header on admin review ===
+HTTP/1.1 403 Forbidden
+Vary: Origin
+cache-control: private, no-store
+content-length: 104
+content-type: application/json
+Date: Mon, 09 Nov 2026 17:45:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== 4. valid operator on /api/admin/review ===
+HTTP/1.1 403 Forbidden
+Vary: Origin
+cache-control: private, no-store
+content-length: 104
+content-type: application/json
+Date: Mon, 09 Nov 2026 17:45:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== 5. synthetic session with a non-loopback Host ===
+HTTP/1.1 403 Forbidden
+Vary: Origin
+Content-Type: text/plain
+Date: Mon, 09 Nov 2026 17:45:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+
+=== 6. operator weather read, budget unset ===
+HTTP/1.1 200 OK
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 17:45:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== 7. operator daily and radar ===
+HTTP/1.1 200 OK
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 17:45:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+HTTP/1.1 503 Service Unavailable
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 17:45:57 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== 8. admin sites list mode ===
+HTTP/1.1 200 OK
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 17:45:58 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+finished 2026-11-09T17:45:58Z
+exit_marker
+
+=== 9. same operator, synthetic flags unset, weather key ===
+HTTP/1.1 503 Service Unavailable
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 17:46:22 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== 10. daily and radar with synthetic flags unset ===
+HTTP/1.1 503 Service Unavailable
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 17:46:22 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+HTTP/1.1 409 Conflict
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 17:46:22 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+=== 11. sites list with synthetic flags unset ===
+HTTP/1.1 503 Service Unavailable
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 17:46:23 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+finished_nosynth 2026-11-09T17:46:23Z
+
+=== 12. after cache-miss wording fix 2026-11-09T17:46:42Z ===
+HTTP/1.1 200 OK
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 17:46:42 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+
+HTTP/1.1 200 OK
+vary: Authorization, RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch, Next-Url, X-Vinext-Interception-Context, X-Vinext-Mounted-Slots, X-Vinext-Rsc-Render-Mode
+cache-control: private, no-store
+content-type: application/json
+transfer-encoding: chunked
+Date: Mon, 09 Nov 2026 17:46:42 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+

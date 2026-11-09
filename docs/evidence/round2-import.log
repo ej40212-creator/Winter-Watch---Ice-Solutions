@@ -1,0 +1,4 @@
+Passed: repeated and shuffled imports preserve ids, duplicates stay separate, exclusions and flags remain, absent rows are not deleted, and exact duplicate rows keep one id.
+Passed full inventory accounting: 3095 input rows, 3094 unactivated sites, 23 duplicate-id reviews, 108 address flags, 1 DC exclusion. Shuffled lineage keys did not change site ids.
+(node:6314) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)

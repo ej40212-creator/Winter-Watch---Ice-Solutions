@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {registerHooks} from 'node:module';
+registerHooks({resolve(specifier,context,next){return next(specifier==='./coverage'?'./coverage.ts':specifier,context);}});
+const {networkAnalytics,performanceSeries}=await import('../lib/analytics.ts');
+const now=Date.parse('2026-11-05T12:00:00Z'),iso=t=>new Date(t).toISOString();
+const good={updated:iso(now-60000),grid:'BOU/1,1',status:'ok',alertsChecked:true,windows:Object.fromEntries([24,48,72,168].map(h=>[h,{complete:true,coverageEnd:iso(now+h*3600000)}]))};
+const sites=[{key:'a',state:'CO'},{key:'b',state:'CO'},{key:'c',state:'WA'},{key:'d',state:'WA'}];
+const data={a:good,b:{...good,updated:iso(now-100*60000)},c:{...good,status:'error',nextRetry:now+10000}};
+const n=networkAnalytics(sites,data,48,now);
+assert.deepEqual(n.freshness.map(f=>f.count),[2,0,1,1]);
+assert.equal(n.windows[1].complete,1);assert.equal(n.grids,1);assert.equal(n.reuse,2);assert.equal(n.retries,1);
+assert.equal(n.states[0].name,'WA');assert.equal(n.states[0].gaps,2);
+const p=performanceSeries([{at:now-300000,count:4,failed:1,durationMs:8000},{at:now,count:2,failed:0,durationMs:6000},{at:now-86400000,count:99,failed:0,durationMs:1}],1,now);
+assert.deepEqual(p.totals,{count:6,failed:1,durationMs:14000});assert.equal(p.points.length,12);
+assert.equal(performanceSeries([],24,now).totals.count,0);
+assert.equal(networkAnalytics([],{},48,now).windows[0].complete,0);
+console.log('Analytics tests passed: freshness, coverage, state gaps, shared grids, retries, time windows, empty data.');
