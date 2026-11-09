@@ -64,6 +64,7 @@ const failDb = await database();
 const now = 1_700_000_000_000;
 const failed = await runBoundedCycle(failDb, {
   now,
+  clock: () => now,
   siteIds: ['site-fail'],
   execution: 'simulation',
   refreshSite: async () => ({ ok: false, error: 'Simulated provider failure' }),
@@ -171,4 +172,40 @@ const abandoned = await running;
 assert.equal(abandoned.status, 'abandoned');
 const slowEffect = await takeoverDb.get("SELECT effect_token FROM refresh_effects WHERE site_id = 'slow'");
 assert.equal(slowEffect, undefined);
-console.log('Passed: scheduler lease, batch cap, backoff, expired-lease recovery, stolen lease, job timestamps, unset due window, and a live clock past 180s. These cycles are simulated and did not call a provider.');
+
+let renewedLive = 60_000_000_000_000;
+const renewDb = await database();
+let markRenewed;
+const renewed = new Promise((resolve) => { markRenewed = resolve; });
+let releaseHold;
+const hold = new Promise((resolve) => { releaseHold = resolve; });
+const renewing = runBoundedCycle(renewDb, {
+  now: renewedLive,
+  clock: () => renewedLive,
+  siteIds: ['one', 'two'],
+  concurrency: 1,
+  execution: 'simulation',
+  refreshSite: async (siteId) => {
+    if (siteId === 'one') renewedLive += 181_000;
+    if (siteId === 'two') {
+      markRenewed();
+      await hold;
+    }
+    return { ok: true };
+  },
+});
+await renewed;
+const refused = await runBoundedCycle(renewDb, {
+  now: renewedLive,
+  clock: () => renewedLive,
+  siteIds: ['intruder'],
+  execution: 'simulation',
+  refreshSite: async () => ({ ok: true }),
+});
+assert.equal(refused.status, 'busy');
+assert.equal(refused.busy, true);
+releaseHold();
+const renewedResult = await renewing;
+assert.equal(renewedResult.status, 'completed');
+assert.equal(renewedResult.ok, 2);
+console.log('Passed: scheduler lease, batch cap, backoff, expired-lease recovery, stolen lease, job timestamps, unset due window, a live clock past 180s, and a renewal that refuses takeover. These cycles are simulated and did not call a provider.');

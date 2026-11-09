@@ -1,3 +1,4 @@
+import { refuseInactiveSite } from "../../../lib/activated-guard";
 import { currentWeather } from "../../../lib/current-weather";
 import { syntheticCurrent } from "../../../lib/synthetic-demo";
 import { PRIVATE_NO_STORE } from "../../../lib/http";
@@ -8,6 +9,10 @@ export async function GET(request: Request) {
   if (!key) return Response.json({ error: "Choose a site." }, { status: 400, headers: PRIVATE_NO_STORE });
   const gate = await prepareRead(request);
   if (gate instanceof Response) return gate;
+  if (!gate.synthetic) {
+    const inactive = await refuseInactiveSite(key);
+    if (inactive) return inactive;
+  }
   if (gate.synthetic) {
     const row = syntheticCurrent(key);
     if (!row) return Response.json({ status: "unavailable", execution: "simulation", error: "Unknown synthetic site." }, { status: 404, headers: PRIVATE_NO_STORE });

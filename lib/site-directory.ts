@@ -2,7 +2,7 @@ import { ulid } from "./ulid.ts";
 import type { Sql, SqlStatement } from "./sql.ts";
 import type { SiteRecord } from "./sites-data.ts";
 
-const BLOCKING_REASONS = new Set(["dup_source_id", "address_flag", "address_changed", "fp_collision"]);
+const BLOCKING_REASONS = new Set(["dup_source_id", "address_flag", "address_changed", "fp_collision", "exact_duplicate", "missing_in_new_batch"]);
 
 export async function loadActivatedSites(db: Sql): Promise<SiteRecord[]> {
   const rows = await db.all<{ key: string; id: string; region: string; address: string; state: string; classification: string }>(
@@ -13,7 +13,7 @@ export async function loadActivatedSites(db: Sql): Promise<SiteRecord[]> {
 
 async function openBlock(db: Sql, siteId: string): Promise<string | null> {
   const rows = await db.all<{ reason: string; site_id: string | null; candidate_site_ids: string | null }>(
-    "SELECT reason, site_id, candidate_site_ids FROM site_review_queue WHERE resolution IS NULL",
+    "SELECT reason, site_id, candidate_site_ids FROM site_review_queue WHERE resolution IS NULL OR resolution = 'defer'",
   );
   for (const row of rows) {
     if (!BLOCKING_REASONS.has(row.reason)) continue;

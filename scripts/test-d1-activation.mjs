@@ -6,7 +6,9 @@ import { wrapNodeSqlite } from '../lib/sql.ts';
 import { ensurePilotSchema } from '../lib/pilot-schema.ts';
 import { importSiteBatch } from '../lib/site-import.ts';
 import { activateSite, loadActivatedSites } from '../lib/site-directory.ts';
-import { applySeedBatch, reviewedSeedStatements } from '../lib/d1-seed.ts';
+import { applySeedBatch } from '../lib/d1-seed.ts';
+import { reviewedSeedStatements } from '../lib/seed-from-import.ts';
+import { contentFingerprint } from '../lib/site-identity.ts';
 import { consumeProviderCall } from '../lib/provider-budget.ts';
 
 const statements = [];
@@ -36,8 +38,18 @@ await memory.run("INSERT INTO site_review_queue(review_id,batch_id,provisional_k
 const blocked = await activateSite(memory, { siteId: site.site_id, actor: 'admin@example.com', decision: 'activate', acknowledgement: 'owner-reviewed', now: '2026-11-09T00:01:00.000Z' });
 assert.equal(blocked.ok, false);
 await memory.run("UPDATE site_review_queue SET resolution = 'defer' WHERE review_id = 'r'");
-const refused = await activateSite(memory, { siteId: site.site_id, actor: 'admin@example.com', decision: 'activate', now: '2026-11-09T00:02:00.000Z' });
-assert.equal(refused.ok, false);
+const deferred = await activateSite(memory, { siteId: site.site_id, actor: 'admin@example.com', decision: 'activate', acknowledgement: 'owner-reviewed', now: '2026-11-09T00:02:00.000Z' });
+assert.equal(deferred.ok, false);
+assert.equal(deferred.error, 'open_review');
+await memory.run("UPDATE site_review_queue SET resolution = 'keep_separate' WHERE review_id = 'r'");
+await memory.run("INSERT INTO site_review_queue(review_id,batch_id,provisional_key,site_id,reason,detail,candidate_site_ids,dedupe_key,created_at) VALUES ('dup','b',NULL,?, 'exact_duplicate','same content',NULL,'dup-key','2026-11-09T00:00:00.000Z')", site.site_id);
+const duplicateBlocked = await activateSite(memory, { siteId: site.site_id, actor: 'admin@example.com', decision: 'activate', acknowledgement: 'owner-reviewed', now: '2026-11-09T00:02:30.000Z' });
+assert.equal(duplicateBlocked.ok, false);
+await memory.run("UPDATE site_review_queue SET resolution = 'keep_separate' WHERE review_id = 'dup'");
+await memory.run("INSERT INTO site_review_queue(review_id,batch_id,provisional_key,site_id,reason,detail,candidate_site_ids,dedupe_key,created_at) VALUES ('miss','b',NULL,?, 'missing_in_new_batch','absent',NULL,'miss-key','2026-11-09T00:00:00.000Z')", site.site_id);
+const missingBlocked = await activateSite(memory, { siteId: site.site_id, actor: 'admin@example.com', decision: 'activate', acknowledgement: 'owner-reviewed', now: '2026-11-09T00:02:40.000Z' });
+assert.equal(missingBlocked.ok, false);
+await memory.run("UPDATE site_review_queue SET resolution = 'keep_separate' WHERE review_id = 'miss'");
 const activated = await activateSite(memory, { siteId: site.site_id, actor: 'admin@example.com', decision: 'activate', acknowledgement: 'owner-reviewed', now: '2026-11-09T00:03:00.000Z' });
 assert.equal(activated.ok, true);
 assert.equal((await loadActivatedSites(memory)).length, 1);
@@ -49,13 +61,28 @@ assert.equal(await consumeProviderCall(memory, 0, 1), false);
 
 const seedDb = wrapNodeSqlite(new DatabaseSync(':memory:'));
 await ensurePilotSchema(seedDb);
-const seed = reviewedSeedStatements([
-  { sourceSiteId: 'S1', address: '1 Synthetic Lane, Fictional City, CO 80014', state: 'CO', classification: 'Event' },
-  { sourceSiteId: 'S2', address: '2 Synthetic Lane, Fictional City, MN 55101', state: 'MN', classification: 'Seasonal' },
-], '2026-11-09T00:00:00.000Z', 'seed-test');
+const seedInput = [
+  { sourceSiteId: 'S1', provisionalKey: 'seed-s1', address: '1 Fictional Campus, Example City, CO 80014', state: 'CO', classification: 'Event' },
+  { sourceSiteId: 'S2', provisionalKey: 'seed-s2', address: '2 Fictional Campus, Example City, MN 55101', state: 'MN', classification: 'Seasonal' },
+];
+const seed = await reviewedSeedStatements(seedInput, '2026-11-09T00:00:00.000Z', 'seed-test');
 await applySeedBatch(seedDb, seed);
-assert.equal((await seedDb.all('SELECT site_id FROM sites')).length, 2);
+await applySeedBatch(seedDb, seed);
+const seeded = await seedDb.all('SELECT site_id, content_fp, source_system FROM sites ORDER BY source_site_id');
+assert.equal(seeded.length, 2);
+assert.equal(seeded[0].content_fp, contentFingerprint('S1', 'CO', seedInput[0].address));
+assert.equal(seeded[0].source_system, 'ice-solutions-workbook');
+assert.equal((await seedDb.all("SELECT reason FROM site_review_queue WHERE reason = 'new_unreviewed'")).length, 2);
 assert.equal((await loadActivatedSites(seedDb)).length, 0);
+const again = await importSiteBatch(seedDb, {
+  rows: seedInput.map((site) => ({ provisionalKey: site.provisionalKey, excelRow: null, sourceSiteId: site.sourceSiteId, sourceSiteIdRaw: site.sourceSiteId, address: site.address, state: site.state, classification: site.classification, region: site.state })),
+  sha256: 'second-file',
+  filename: 'again.json',
+  now: '2026-11-09T01:00:00.000Z',
+});
+assert.equal(again.sitesCreated, 0);
+assert.equal(again.sitesReused, 2);
+assert.equal((await seedDb.all('SELECT site_id FROM sites')).length, 2);
 const failing = wrapNodeSqlite(new DatabaseSync(':memory:'));
 await ensurePilotSchema(failing);
 await assert.rejects(() => applySeedBatch(failing, [...seed, { sql: 'INSERT INTO missing_table(id) VALUES (?)', params: ['x'] }]));

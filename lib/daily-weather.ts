@@ -1,12 +1,24 @@
 import {env} from 'cloudflare:workers';
-import {cached,save,json,resolveLocation} from './weather';
+import {fetchProviderJson} from './forecast-run';
+import {cached,consumeLiveBudget,save,json,resolveLocation} from './weather';
 import {normalizeAccu,type DailyResult} from './daily';
 
 export const location=resolveLocation;
-async function accuJSON(path:string,token:string){
- const response=await fetch('https://dataservice.accuweather.com'+path,{headers:{Authorization:'Bearer '+token,Accept:'application/json'},signal:AbortSignal.timeout(16000)});
- if(!response.ok)throw Error(response.status===401||response.status===403?'AccuWeather access is not authorized for this forecast.':response.status===429?'AccuWeather request allowance reached. Try again later.':'AccuWeather is temporarily unavailable.');
- return response.json() as Promise<any>;
+async function accuJSON(path:string,token:string):Promise<any>{
+ try {
+  return await fetchProviderJson({
+   url:'https://dataservice.accuweather.com'+path,
+   allowLive:true,
+   headers:{Authorization:'Bearer '+token,Accept:'application/json'},
+   consume:()=>consumeLiveBudget(),
+  });
+ } catch (error) {
+  const message=error instanceof Error?error.message:'';
+  if (/\(401\)|\(403\)/.test(message)) throw Error('AccuWeather access is not authorized for this forecast.');
+  if (/rate limit|429/.test(message)) throw Error('AccuWeather request allowance reached. Try again later.');
+  if (/budget/i.test(message)) throw error;
+  throw Error('AccuWeather is temporarily unavailable.');
+ }
 }
 export async function dailyForecast(key:string,provider:'nws'|'accuweather',allowLive=false):Promise<DailyResult>{
  const rightsConfirmed=(env as any).ACCUWEATHER_RIGHTS_CONFIRMED==='authorized';

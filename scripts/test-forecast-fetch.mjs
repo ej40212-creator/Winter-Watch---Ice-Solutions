@@ -47,6 +47,14 @@ await assert.rejects(fetchProviderJson({
   fetchImpl: () => { fetches += 1; throw new DOMException('The operation was aborted.', 'AbortError'); },
 }), /timed out/);
 assert.equal(fetches, 2);
+let charges = 0;
+await assert.rejects(fetchProviderJson({
+  url: hourly,
+  allowLive: true,
+  consume: async () => { charges += 1; return true; },
+  fetchImpl: () => { throw new DOMException('The operation was aborted.', 'AbortError'); },
+}), /timed out/);
+assert.equal(charges, 2);
 await assert.rejects(fetchProviderJson({
   url: hourly,
   allowLive: true,

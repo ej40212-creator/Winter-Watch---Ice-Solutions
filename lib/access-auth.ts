@@ -78,8 +78,8 @@ function bytesAsBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-export function loadAccessConfig(env: EnvBag, options?: { devBuild?: boolean; forceSynthetic?: boolean; staticJwks?: { keys: JsonWebKey[] } }): ConfigResult {
-  let synthetic = options?.forceSynthetic === true;
+export function loadAccessConfig(env: EnvBag, options?: { devBuild?: boolean; staticJwks?: { keys: JsonWebKey[] } }): ConfigResult {
+  let synthetic = false;
   if (import.meta.env?.DEV === true && options?.devBuild === true && env.PILOT_SYNTHETIC_AUTH === "1") synthetic = true;
   const audience = env.ACCESS_AUD || (synthetic ? SYNTHETIC_AUDIENCE : "");
   const issuer = env.ACCESS_ISSUER || (env.ACCESS_TEAM_DOMAIN ? `https://${env.ACCESS_TEAM_DOMAIN}` : synthetic ? SYNTHETIC_ISSUER : "");

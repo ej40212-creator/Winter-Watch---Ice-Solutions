@@ -1,8 +1,7 @@
 name: pilot
 # Typecheck, unit tests, secret scan, production build, and the bundle check.
-# Push only. Firing pull_request at the same time produced a second run with
-# zero jobs and a startup failure, which left the pull request red.
 on:
+  pull_request:
   push:
     branches: [main, cursor/winter-watch-private-pilot-41d4]
 jobs:

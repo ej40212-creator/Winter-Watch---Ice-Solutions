@@ -1,7 +1,10 @@
+import { env as workerEnv } from "cloudflare:workers";
 import { authenticate, loadAccessConfig, readRuntimeEnv, type AccessIdentity, type EnvBag } from "./access-auth.ts";
+import { consumeDurableRate } from "./provider-budget.ts";
 import { consumeIdentityRate, providerDecision, rateLimitPerMinute } from "./provider-policy.ts";
 import { tokenFromRequest } from "./request-guard.ts";
 import { allowsWrite } from "./same-origin.ts";
+import { wrapD1 } from "./sql-d1.ts";
 import { syntheticDataAllowed } from "./synthetic-gate.ts";
 
 const PRIVATE = { "cache-control": "private, no-store" };
@@ -16,9 +19,13 @@ export async function accessIdentity(request: Request, env: EnvBag = readRuntime
   const decision = await authenticate(tokenFromRequest(request), loaded.config, now);
   if (!decision.ok) return Response.json({ error: decision.error, message: decision.message }, { status: decision.status, headers: PRIVATE });
   const limit = rateLimitPerMinute(env);
-  const rate = consumeIdentityRate(decision.identity.sub || decision.identity.email, now, limit.limit);
-  if (!rate.allowed) {
-    return Response.json({ error: "rate_limited", message: "This identity exceeded the per-minute request limit.", policy: limit.policy }, { status: 429, headers: { ...PRIVATE, "x-rate-limit-policy": limit.policy } });
+  const database = (workerEnv as { DB?: D1Database }).DB;
+  const identity = decision.identity.sub || decision.identity.email;
+  const allowed = database
+    ? await consumeDurableRate(wrapD1(database), identity, now, limit.limit)
+    : consumeIdentityRate(identity, now, limit.limit).allowed;
+  if (!allowed) {
+    return Response.json({ error: "rate_limited", message: "This identity exceeded the per-minute request limit.", policy: database ? "durable" : limit.policy }, { status: 429, headers: { ...PRIVATE, "x-rate-limit-policy": database ? "durable" : limit.policy } });
   }
   return { identity: decision.identity, env };
 }

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS sites (
 CREATE INDEX IF NOT EXISTS sites_source_idx ON sites(source_site_id, state);
 CREATE INDEX IF NOT EXISTS sites_fp_idx ON sites(content_fp);
 CREATE INDEX IF NOT EXISTS sites_system_idx ON sites(source_system);
+CREATE UNIQUE INDEX IF NOT EXISTS sites_fp_owner_idx ON sites(source_system, content_fp) WHERE status != 'excluded';
 
 CREATE TABLE IF NOT EXISTS site_import_batches (
   batch_id TEXT PRIMARY KEY,

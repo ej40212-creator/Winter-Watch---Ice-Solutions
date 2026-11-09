@@ -1,3 +1,4 @@
+import { refuseInactiveSite } from "../../../lib/activated-guard";
 import { winterGuidance } from "../../../lib/noaa";
 import { PRIVATE_NO_STORE } from "../../../lib/http";
 import { NOT_RUN, prepareRead } from "../../../lib/api-access";
@@ -8,6 +9,8 @@ export async function GET(request: Request) {
   const gate = await prepareRead(request);
   if (gate instanceof Response) return gate;
   if (gate.synthetic) return Response.json({ error: "Synthetic mode did not call NOAA guidance.", execution: "simulation" }, { status: 503, headers: PRIVATE_NO_STORE });
+  const inactive = await refuseInactiveSite(key);
+  if (inactive) return inactive;
   if (!gate.allowLive) return Response.json({ ...NOT_RUN }, { status: 409, headers: PRIVATE_NO_STORE });
   try {
     return Response.json(await winterGuidance(key, true), { headers: PRIVATE_NO_STORE });

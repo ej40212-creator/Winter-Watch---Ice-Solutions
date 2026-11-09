@@ -16,12 +16,13 @@ const tests = [
   "scripts/test-jwks.mjs",
   "scripts/test-d1-activation.mjs",
   "scripts/test-forecast-fetch.mjs",
+  "scripts/test-forecast.mjs",
   "scripts/test-xlsx-reader.mjs",
   "scripts/test-request-guards.mjs",
 ];
 let failed = 0;
 for (const test of tests) {
-  const result = spawnSync(process.execPath, ["--experimental-strip-types", test], { stdio: "inherit", env: process.env });
+  const result = spawnSync(process.execPath, ["--experimental-strip-types", "--import", "./scripts/register-workers-stub.mjs", test], { stdio: "inherit", env: process.env });
   if (result.status !== 0) failed += 1;
 }
 if (failed) {

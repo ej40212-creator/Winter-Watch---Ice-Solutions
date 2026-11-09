@@ -252,7 +252,7 @@ export async function runBoundedCycle(
               finishedAt,
               error,
               failuresCount,
-              input.now + retryDelay("temporary", failuresCount),
+              clock() + retryDelay("temporary", failuresCount),
             );
           }
         } catch (error) {
@@ -278,7 +278,7 @@ export async function runBoundedCycle(
             finishedAt,
             message,
             failuresCount,
-            input.now + retryDelay("temporary", failuresCount),
+            clock() + retryDelay("temporary", failuresCount),
           );
         }
       }

@@ -7,18 +7,19 @@ export async function fetchProviderJson(input: {
   allowLive: boolean;
   fetchImpl?: typeof fetch;
   consume?: () => Promise<boolean>;
+  headers?: HeadersInit;
 }): Promise<unknown> {
   if (!input.allowLive) throw new Error(BLOCKED);
-  if (input.consume && !(await input.consume())) throw new Error("Provider budget for this period is exhausted. No further provider call was made.");
   const fetchImpl = input.fetchImpl ?? fetch;
+  const headers = new Headers(input.headers);
+  if (!headers.has("User-Agent")) headers.set("User-Agent", "IceSolutionsWinterWatch (https://myicesolutions.com)");
+  if (!headers.has("Accept")) headers.set("Accept", "application/geo+json, application/json");
   let response: Response | undefined;
   let aborted = false;
   for (let attempt = 0; attempt < 2; attempt++) {
+    if (input.consume && !(await input.consume())) throw new Error("Provider budget for this period is exhausted. No further provider call was made.");
     try {
-      response = await fetchImpl(input.url, {
-        headers: { "User-Agent": "IceSolutionsWinterWatch (https://myicesolutions.com)", Accept: "application/geo+json, application/json" },
-        signal: AbortSignal.timeout(16000),
-      });
+      response = await fetchImpl(input.url, { headers, signal: AbortSignal.timeout(16000) });
       aborted = false;
     } catch {
       aborted = true;

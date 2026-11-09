@@ -57,4 +57,14 @@ delete header.kid;
 noKid[0] = Buffer.from(JSON.stringify(header)).toString('base64url');
 const missingKid = await authenticate(noKid.join('.'), loaded.config, now, rotating);
 assert.equal(missingKid.ok, false);
-console.log('Passed: JWKS URL wins over static JSON, unknown kid refetches once, cache TTL skips a second fetch, timeout fails closed, and kid is required.');
+resetJwksCache();
+let unknownFetches = 0;
+const stillMissing = async () => {
+  unknownFetches += 1;
+  return { ok: true, json: async () => ({ keys: [{ ...publicJwk, kid: 'someone-else' }] }) };
+};
+const stillUnknown = await authenticate(token, loaded.config, now, stillMissing);
+assert.equal(stillUnknown.ok, false);
+assert.equal(stillUnknown.status, 401);
+assert.equal(unknownFetches, 2);
+console.log('Passed: JWKS URL wins over static JSON, unknown kid refetches once, a kid still missing after refetch is rejected, cache TTL skips a second fetch, timeout fails closed, and kid is required.');

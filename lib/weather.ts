@@ -56,12 +56,13 @@ async function takeBudget(){
  if(!decision.allowLive||decision.budget==null) return false;
  return consumeProviderCall(wrapD1(db()), Date.now(), decision.budget);
 }
+export function consumeLiveBudget(){return takeBudget();}
 export async function readOutlook(key:string){return cached(outlookCacheKey(key),false);}
 export async function forecast(key:string, options:{allowLive?:boolean;sites?:SiteRecord[]}={}) {
  const allowLive=options.allowLive===true;
  const site=await activatedSite(key,options.sites); if(!site)throw new Error('Unknown US state site');
  const outlookKey=outlookCacheKey(key);
- const previous=await cached(outlookKey); if(previous&&!previous.nextRetry&&(!previous.sourceAddress||previous.sourceAddress===site.address))return {...previous,execution:previous.execution||'cache'};
+ const previous=await cached(outlookKey); if(previous&&!previous.nextRetry&&(!previous.sourceAddress||previous.sourceAddress===site.address))return {...previous,execution:'cache'};
  const prior=await cached(outlookKey,false);
  if(!allowLive)return prior?{...prior,execution:'cache'}:{key,status:'unavailable',execution:'not_run',error:BLOCKED,minTemp:null,alerts:[],hours:[],hazards:[],complete:false,priority:0,alertsChecked:false};
  if(prior?.nextRetry>Date.now()&&prior.sourceAddress===site.address)return prior;

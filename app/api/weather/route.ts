@@ -3,17 +3,18 @@ import { forecast, nationalAlerts, readOutlook, snapshot } from "../../../lib/we
 import { syntheticOutlook, syntheticSnapshot } from "../../../lib/synthetic-demo";
 import { PRIVATE_NO_STORE } from "../../../lib/http";
 import { NOT_RUN, prepareRead } from "../../../lib/api-access";
+import { refuseInactiveSite } from "../../../lib/activated-guard";
 import { loadActivatedSites } from "../../../lib/site-directory";
 import { wrapD1 } from "../../../lib/sql-d1";
 
-async function activatedIds(): Promise<Set<string>> {
+async function activatedIds(): Promise<Set<string> | Response> {
   const database = (env as { DB?: D1Database }).DB;
   if (!database) return new Set();
   try {
     const sites = await loadActivatedSites(wrapD1(database));
     return new Set(sites.map((site) => site.key));
   } catch {
-    return new Set();
+    return Response.json({ error: "configuration_required", message: "D1 is bound but the pilot schema is not applied, or the sites query failed. No cached site data was returned.", execution: "not_run" }, { status: 503, headers: PRIVATE_NO_STORE });
   }
 }
 
@@ -33,8 +34,8 @@ export async function GET(request: Request) {
     }
     if (url.searchParams.has("key")) {
       const key = url.searchParams.get("key")!;
-      const allowed = await activatedIds();
-      if (!allowed.has(key)) return Response.json({ error: "That site is not activated.", execution: "not_run" }, { status: 404, headers: PRIVATE_NO_STORE });
+      const inactive = await refuseInactiveSite(key);
+      if (inactive) return inactive;
       if (!gate.allowLive) {
         let cached = null;
         try { cached = await readOutlook(key); } catch { cached = null; }
@@ -47,6 +48,7 @@ export async function GET(request: Request) {
       return Response.json(await nationalAlerts(true), { headers: PRIVATE_NO_STORE });
     }
     const allowed = await activatedIds();
+    if (allowed instanceof Response) return allowed;
     const rows = await snapshot();
     return Response.json(rows.filter((row: { key?: string }) => row.key && allowed.has(row.key)), { headers: PRIVATE_NO_STORE });
   } catch {

@@ -1,22 +1,21 @@
 # Loading a reviewed slice into local D1
 
-The procedural importer in `lib/site-import.ts` is a Node sqlite tool. It uses `BEGIN`/`COMMIT` and is not the worker path. A D1 load of a reviewed slice is 1 to 40 sites, inserted unactivated, in one batch.
+A reviewed load is 1 to 40 sites. The statements come from the workbook importer, so the content fingerprint, source system, lineage rows, and address or duplicate review flags match a later import of the same rows. The sites stay `operational = 0`. Running the same statements again is a no-op: inserts use `INSERT OR IGNORE`, and `(source_system, content_fp)` is unique for sites that are not excluded.
 
-Generate SQL from a JSON file that is not committed. The file has no `BEGIN` or `COMMIT`. Wrangler’s local D1 rejects those statements. The all-or-nothing path is `applySeedBatch`, which uses D1 `batch()` (or one sqlite transaction in the Node tool). A failed statement in that batch leaves no partial seed:
+Generate the statements from a JSON file that is not committed:
 
 ```bash
 node --experimental-strip-types scripts/d1-seed-sql.mjs --json /tmp/reviewed-sites.json > /tmp/reviewed-seed.sql
 ```
 
-Each object needs `sourceSiteId`, `address`, `state`, and `classification`. The script refuses more than 40 rows.
+Each object needs `sourceSiteId`, `address`, `state`, and `classification`. `provisionalKey` is optional. The script refuses more than 40 rows.
 
-Apply it to local D1 with the single Wrangler config:
+The tested all-or-nothing apply path is `applySeedBatch`, which uses D1 `batch()` (or one sqlite transaction in the Node tool). A failed statement leaves no partial seed. `scripts/d1-batch-evidence.ts` is a local wrangler entrypoint for that check. It is not the application worker. Post `{ "statements": [...] }` to it. `wrangler d1 execute --file` is not that path: local D1 rejects `BEGIN`/`COMMIT`, and a multi-statement file is not one transaction.
+
+Apply the pilot schema, which is idempotent, with:
 
 ```bash
 npx wrangler d1 execute winter-watch-pilot --local --config wrangler.jsonc --file db/0001_pilot.sql
-npx wrangler d1 execute winter-watch-pilot --local --config wrangler.jsonc --file /tmp/reviewed-seed.sql
 ```
-
-`applySeedBatch` uses D1 `batch()`, which commits all statements or none. `scripts/d1-batch-evidence.ts` is a local wrangler entrypoint for that check. It is not the application worker. The sites stay `operational = 0` until `POST /api/admin/sites`.
 
 Do not point this at a hosted database from this repository. Hosted D1 is a later gate.
